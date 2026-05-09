@@ -58,7 +58,7 @@ def _format_varchar(value) -> str:
 def _iter_customer_rows(payload: dict):
     for row in payload.get("rows", []):
         nickname = row.get("客服昵称")
-        if not nickname or nickname in SUMMARY_NAMES:
+        if not nickname:
             continue
         yield row
 
@@ -107,29 +107,13 @@ def build_upsert_sql(payload: dict) -> str:
         )
 
     return (
+        "DELETE FROM feizhu.fliggy_customer_service_performance_workload_analysis\n"
+        f"WHERE `date_time` = '{biz_date}';\n"
         "INSERT INTO feizhu.fliggy_customer_service_performance_workload_analysis\n"
         "(`旺旺昵称`, `咨询人数`, `接待人数`, `直接接待人数`, `转入人数`, `转出人数`, `总消息`, `买家消息`, `客服消息`, `答问比`, `客服字数`, `最大同时接待`, `未回复人数`, `旺旺回复率`, `慢响应人数`, `长接待人数`, `首次响应秒`, `平均响应秒`, `平均接待秒`, `date_time`)\n"
         "VALUES\n"
         + ",\n".join(values)
-        + "\nON DUPLICATE KEY UPDATE\n"
-        "`咨询人数` = VALUES(`咨询人数`),\n"
-        "`接待人数` = VALUES(`接待人数`),\n"
-        "`直接接待人数` = VALUES(`直接接待人数`),\n"
-        "`转入人数` = VALUES(`转入人数`),\n"
-        "`转出人数` = VALUES(`转出人数`),\n"
-        "`总消息` = VALUES(`总消息`),\n"
-        "`买家消息` = VALUES(`买家消息`),\n"
-        "`客服消息` = VALUES(`客服消息`),\n"
-        "`答问比` = VALUES(`答问比`),\n"
-        "`客服字数` = VALUES(`客服字数`),\n"
-        "`最大同时接待` = VALUES(`最大同时接待`),\n"
-        "`未回复人数` = VALUES(`未回复人数`),\n"
-        "`旺旺回复率` = VALUES(`旺旺回复率`),\n"
-        "`慢响应人数` = VALUES(`慢响应人数`),\n"
-        "`长接待人数` = VALUES(`长接待人数`),\n"
-        "`首次响应秒` = VALUES(`首次响应秒`),\n"
-        "`平均响应秒` = VALUES(`平均响应秒`),\n"
-        "`平均接待秒` = VALUES(`平均接待秒`);"
+        + ";"
     )
 
 

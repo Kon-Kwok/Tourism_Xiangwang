@@ -58,7 +58,7 @@ def _format_varchar(value) -> str:
 def _iter_customer_rows(payload: dict):
     for row in payload.get("rows", []):
         nickname = row.get("客服昵称")
-        if not nickname or nickname in SUMMARY_NAMES:
+        if not nickname:
             continue
         yield row
 
@@ -101,23 +101,13 @@ def build_upsert_sql(payload: dict) -> str:
         )
 
     return (
+        "DELETE FROM feizhu.fliggy_customer_service_data_daily\n"
+        f"WHERE `日期` = '{biz_date}';\n"
         "INSERT INTO feizhu.fliggy_customer_service_data_daily\n"
         "(`日期`, `旺旺`, `接待人数`, `平均响应秒`, `回复率`, `询单最终付款成功率`, `上班天数`, `评价发送率`, `客户满意比`, `很满意`, `满意`, `一般`, `不满意`, `很不满意`)\n"
         "VALUES\n"
         + ",\n".join(values)
-        + "\nON DUPLICATE KEY UPDATE\n"
-        "`接待人数` = VALUES(`接待人数`),\n"
-        "`平均响应秒` = VALUES(`平均响应秒`),\n"
-        "`回复率` = VALUES(`回复率`),\n"
-        "`询单最终付款成功率` = VALUES(`询单最终付款成功率`),\n"
-        "`上班天数` = VALUES(`上班天数`),\n"
-        "`评价发送率` = VALUES(`评价发送率`),\n"
-        "`客户满意比` = VALUES(`客户满意比`),\n"
-        "`很满意` = VALUES(`很满意`),\n"
-        "`满意` = VALUES(`满意`),\n"
-        "`一般` = VALUES(`一般`),\n"
-        "`不满意` = VALUES(`不满意`),\n"
-        "`很不满意` = VALUES(`很不满意`);"
+        + ";"
     )
 
 
