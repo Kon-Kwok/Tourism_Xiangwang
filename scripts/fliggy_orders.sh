@@ -50,14 +50,14 @@ print_success "预处理完成"
 print_step 3 4 "订单明细入库"
 cat /tmp/orders_prep_$$.json | \
   python3 bin/prepare_fliggy_order_list_sql.py | \
-  $MYSQL feizhu
+  $MYSQL Xiangwang
 print_success "订单明细入库完成"
 
 # 步骤4: 订单汇总入库（total_bookings / total_pax / gmv）到千牛日度关键表
 print_step 4 4 "订单汇总入库"
 cat /tmp/orders_prep_$$.json | \
   python3 bin/prepare_qianniu_shop_daily_key_sql.py | \
-  $MYSQL qianniu
+  $MYSQL Xiangwang
 print_success "订单汇总入库完成"
 
 # 清理临时文件

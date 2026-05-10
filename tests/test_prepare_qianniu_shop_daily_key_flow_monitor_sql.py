@@ -32,12 +32,13 @@ class PrepareQianniuShopDailyKeyFlowMonitorSqlTests(unittest.TestCase):
 
         sql = MODULE.build_update_sql(payload)
 
-        self.assertIn("INSERT INTO qianniu.qianniu_fliggy_shop_daily_key_data", sql)
-        self.assertIn("VALUES ('2026-04-20', 31835, 13653, 10510, 4030)", sql)
-        self.assertIn("total_pv = VALUES(total_pv)", sql)
-        self.assertIn("total_uv = VALUES(total_uv)", sql)
-        self.assertIn("`流量来源广告_uv` = VALUES(`流量来源广告_uv`)", sql)
-        self.assertIn("`流量来源平台_uv` = VALUES(`流量来源平台_uv`)", sql)
+        self.assertIn("UPDATE Xiangwang.shop_daily_key_data", sql)
+        self.assertIn("total_pv = 31835", sql)
+        self.assertIn("total_uv = 13653", sql)
+        self.assertIn("`流量来源广告_uv` = 10510", sql)
+        self.assertIn("`流量来源平台_uv` = 4030", sql)
+        self.assertIn("SET total_pv = NULL", sql)
+        self.assertIn("WHERE NOT EXISTS", sql)
 
     def test_build_update_sql_rejects_non_single_row_payload(self):
         payload = {
@@ -67,8 +68,7 @@ class PrepareQianniuShopDailyKeyFlowMonitorSqlTests(unittest.TestCase):
             exit_code = MODULE.main()
 
         self.assertEqual(exit_code, 0)
-        self.assertIn("VALUES ('2026-04-20', 31835, 13653, 10510, 4030)", stdout.getvalue())
-        self.assertIn("total_pv = VALUES(total_pv)", stdout.getvalue())
+        self.assertIn("total_pv = 31835", stdout.getvalue())
 
 
 if __name__ == "__main__":

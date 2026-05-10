@@ -23,7 +23,7 @@ class ExecMysqlSqlTests(unittest.TestCase):
                 "MYSQL_PORT=3306\n"
                 "MYSQL_USER=test_user\n"
                 "MYSQL_PASSWORD=test_password\n"
-                "MYSQL_DATABASE=qianniu\n"
+                "MYSQL_DATABASE=Xiangwang\n"
             )
 
             config = MODULE.load_env_file(env_path)
@@ -32,7 +32,7 @@ class ExecMysqlSqlTests(unittest.TestCase):
         self.assertEqual(config["MYSQL_PORT"], "3306")
         self.assertEqual(config["MYSQL_USER"], "test_user")
         self.assertEqual(config["MYSQL_PASSWORD"], "test_password")
-        self.assertEqual(config["MYSQL_DATABASE"], "qianniu")
+        self.assertEqual(config["MYSQL_DATABASE"], "Xiangwang")
 
     @mock.patch("subprocess.run")
     def test_main_reads_stdin_and_executes_mysql_with_env_file(self, mock_run):
@@ -45,7 +45,7 @@ class ExecMysqlSqlTests(unittest.TestCase):
                 "MYSQL_PORT=3306\n"
                 "MYSQL_USER=test_user\n"
                 "MYSQL_PASSWORD=test_password\n"
-                "MYSQL_DATABASE=qianniu\n"
+                "MYSQL_DATABASE=Xiangwang\n"
             )
             stdin = io.StringIO("SELECT 1;")
             stdout = io.StringIO()
@@ -61,7 +61,7 @@ class ExecMysqlSqlTests(unittest.TestCase):
         self.assertIn("--host=localhost", mock_run.call_args.args[0])
         self.assertIn("--port=3306", mock_run.call_args.args[0])
         self.assertIn("--user=test_user", mock_run.call_args.args[0])
-        self.assertIn("qianniu", mock_run.call_args.args[0])
+        self.assertIn("Xiangwang", mock_run.call_args.args[0])
 
 
 if __name__ == "__main__":

@@ -35,7 +35,7 @@ class ShopSourceStorage:
     def _get_schema_sql(self) -> Iterable[str]:
         """获取建表SQL"""
         yield """
-            CREATE TABLE IF NOT EXISTS sycm_shop_source_collection_batches (
+            CREATE TABLE IF NOT EXISTS shop_source_collection_batches (
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
                 biz_date DATE NOT NULL,
                 shop_name VARCHAR(255) NOT NULL,
@@ -47,7 +47,7 @@ class ShopSourceStorage:
         """
 
         yield """
-            CREATE TABLE IF NOT EXISTS sycm_shop_source_metrics (
+            CREATE TABLE IF NOT EXISTS shop_source_metrics (
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
                 batch_id BIGINT NOT NULL,
                 biz_date DATE NOT NULL,
@@ -80,7 +80,24 @@ class ShopSourceStorage:
             # 创建批次记录
             summary = data.get('summary', {})
             cursor.execute("""
-                INSERT INTO sycm_shop_source_collection_batches
+                DELETE m
+                FROM shop_source_metrics m
+                JOIN shop_source_collection_batches b ON b.id = m.batch_id
+                WHERE b.biz_date = %s AND b.shop_name = %s
+            """, (
+                summary.get('collection_date'),
+                summary.get('shop_name'),
+            ))
+            cursor.execute("""
+                DELETE FROM shop_source_collection_batches
+                WHERE biz_date = %s AND shop_name = %s
+            """, (
+                summary.get('collection_date'),
+                summary.get('shop_name'),
+            ))
+
+            cursor.execute("""
+                INSERT INTO shop_source_collection_batches
                 (biz_date, shop_name, status, started_at)
                 VALUES (%s, %s, %s, NOW())
             """, (
@@ -95,7 +112,7 @@ class ShopSourceStorage:
             # 插入指标数据
             for metric in metrics:
                 cursor.execute("""
-                    INSERT INTO sycm_shop_source_metrics
+                    INSERT INTO shop_source_metrics
                     (batch_id, biz_date, page_code, shop_name, source_name, uv, uv_ratio, page_id, channel_type)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (
@@ -113,16 +130,8 @@ class ShopSourceStorage:
             conn.commit()
             return batch_id
 
-        except Exception as e:
+        except Exception:
             conn.rollback()
-            # 更新批次状态为失败
-            if 'batch_id' in locals():
-                cursor.execute("""
-                    UPDATE sycm_shop_source_collection_batches
-                    SET status = 'error', error_message = %s, finished_at = NOW()
-                    WHERE id = %s
-                """, (str(e), batch_id))
-                conn.commit()
             raise
 
         finally:

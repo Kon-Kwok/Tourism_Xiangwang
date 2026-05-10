@@ -18,7 +18,15 @@ from tourism_automation.shared.http.json_client import JsonHttpClient
 CHROME_COOKIE_DB = Path.home() / ".config/google-chrome-debug/Default/Cookies"
 CHROME_SAFE_STORAGE_LABEL = "Chrome Safe Storage"
 CHROME_COOKIE_HOST_KEYS = (
+    ".alimama.com",
     "sycm.taobao.com",
+    "brandsearch.taobao.com",
+    "branding.taobao.com",
+    "one.alimama.com",
+    "club.alimama.com",
+    "bpcommon.alimama.com",
+    "ai.alimama.com",
+    "pass.alimama.com",
     ".taobao.com",
     ".fliggy.com",
     "fsc.fliggy.com",
@@ -69,6 +77,8 @@ def build_chrome_session() -> requests.Session:
             )
             if not cookie_value:
                 continue
+            if not _is_http_header_value(cookie_value):
+                continue
             session.cookies.set(
                 name,
                 cookie_value,
@@ -113,3 +123,11 @@ def _decrypt_cookie_value(*, encrypted_value: bytes, key: bytes, host_hash_len: 
             decrypted = decrypted[host_hash_len:]
         return decrypted.decode("utf-8", errors="ignore")
     return encrypted_value.decode("utf-8", errors="ignore")
+
+
+def _is_http_header_value(value: str) -> bool:
+    try:
+        value.encode("latin-1")
+    except UnicodeEncodeError:
+        return False
+    return True

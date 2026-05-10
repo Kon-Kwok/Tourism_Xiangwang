@@ -63,7 +63,7 @@ def build_upsert_sql(payload):
 -- GMV: {summary.get('gmv')}
 
 -- 创建表（如果不存在）
-CREATE TABLE IF NOT EXISTS fliggy_order_list (
+CREATE TABLE IF NOT EXISTS order_list (
     order_id VARCHAR(50) PRIMARY KEY,
     item_title VARCHAR(300),
     package_type VARCHAR(200),
@@ -76,21 +76,14 @@ CREATE TABLE IF NOT EXISTS fliggy_order_list (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 清理旧数据（可选）
--- DELETE FROM fliggy_order_list WHERE order_date = '{summary.get('deal_start', '').split()[0]}';
+-- 清理当天旧数据，避免重复入库
+DELETE FROM order_list WHERE order_date = '{summary.get('deal_start', '').split()[0]}';
 
 -- 插入数据
-INSERT INTO fliggy_order_list
+INSERT INTO order_list
 (order_id, item_title, package_type, buy_mount, actual_fee, order_time, status_text, order_date)
 VALUES
-{',\n'.join(values)}
-ON DUPLICATE KEY UPDATE
-  item_title = VALUES(item_title),
-  package_type = VALUES(package_type),
-  buy_mount = VALUES(buy_mount),
-  actual_fee = VALUES(actual_fee),
-  order_time = VALUES(order_time),
-  status_text = VALUES(status_text);
+{',\n'.join(values)};
 """
 
 def main():

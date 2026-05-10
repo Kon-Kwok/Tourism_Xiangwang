@@ -60,21 +60,26 @@ def build_upsert_sql(payload: dict) -> str:
 -- 飞猪订单汇总写入千牛飞猪店铺日度关键数据
 -- 日期: {biz_date}
 
-UPDATE qianniu.qianniu_fliggy_shop_daily_key_data
+INSERT INTO Xiangwang.shop_daily_key_data (日期, created_at)
+SELECT '{biz_date}', NOW()
+FROM DUAL
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM Xiangwang.shop_daily_key_data
+    WHERE 日期 = '{biz_date}'
+);
+
+UPDATE Xiangwang.shop_daily_key_data
+SET total_bookings = NULL,
+    total_pax = NULL,
+    gmv = NULL
+WHERE 日期 = '{biz_date}';
+
+UPDATE Xiangwang.shop_daily_key_data
 SET total_bookings = {total_bookings},
     total_pax = {total_pax},
     gmv = {gmv}
 WHERE 日期 = '{biz_date}';
-
-INSERT INTO qianniu.qianniu_fliggy_shop_daily_key_data
-(日期, total_bookings, total_pax, gmv, created_at)
-SELECT '{biz_date}', {total_bookings}, {total_pax}, {gmv}, NOW()
-FROM DUAL
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM qianniu.qianniu_fliggy_shop_daily_key_data
-    WHERE 日期 = '{biz_date}'
-);
 """
 
 

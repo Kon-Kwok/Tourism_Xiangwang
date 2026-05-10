@@ -43,7 +43,7 @@ if ! check_file_not_empty "/tmp/sycm_flow_$$.sql" "SQL转换失败"; then
   exit 1
 fi
 
-if ! grep -q "qianniu_shop_data_daily_registration" /tmp/sycm_flow_$$.sql; then
+if ! grep -q "shop_data_daily_registration" /tmp/sycm_flow_$$.sql; then
   print_error "SQL缺少关注店铺人数入库语句"
   rm -f /tmp/sycm_flow_$$.json /tmp/sycm_flow_$$.sql
   exit 1
@@ -52,7 +52,7 @@ print_success "转换完成"
 
 # 步骤3: 入库
 print_step 3 3 "数据入库"
-cat /tmp/sycm_flow_$$.sql | $MYSQL qianniu
+cat /tmp/sycm_flow_$$.sql | $MYSQL Xiangwang
 print_success "入库完成"
 
 # 清理临时文件

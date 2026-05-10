@@ -33,7 +33,7 @@ class EmployeeKpiStorage:
     def _get_schema_sql(self) -> Iterable[str]:
         """获取建表SQL"""
         yield """
-            CREATE TABLE IF NOT EXISTS fliggy_employee_kpi_collection_batches (
+            CREATE TABLE IF NOT EXISTS employee_kpi_collection_batches (
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
                 biz_date DATE NOT NULL,
                 shop_name VARCHAR(255) NOT NULL,
@@ -47,7 +47,7 @@ class EmployeeKpiStorage:
         """
 
         yield """
-            CREATE TABLE IF NOT EXISTS fliggy_employee_kpi_metrics (
+            CREATE TABLE IF NOT EXISTS employee_kpi_metrics (
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
                 batch_id BIGINT NOT NULL,
                 biz_date DATE NOT NULL,
@@ -87,7 +87,28 @@ class EmployeeKpiStorage:
             # 创建批次记录
             summary = data.get('summary', {})
             cursor.execute("""
-                INSERT INTO fliggy_employee_kpi_collection_batches
+                DELETE m
+                FROM employee_kpi_metrics m
+                JOIN employee_kpi_collection_batches b ON b.id = m.batch_id
+                WHERE b.biz_date = %s
+                  AND b.shop_name = %s
+                  AND b.kpi_id = %s
+            """, (
+                summary.get('collection_date'),
+                summary.get('shop_name'),
+                summary.get('kpi_id'),
+            ))
+            cursor.execute("""
+                DELETE FROM employee_kpi_collection_batches
+                WHERE biz_date = %s AND shop_name = %s AND kpi_id = %s
+            """, (
+                summary.get('collection_date'),
+                summary.get('shop_name'),
+                summary.get('kpi_id'),
+            ))
+
+            cursor.execute("""
+                INSERT INTO employee_kpi_collection_batches
                 (biz_date, shop_name, kpi_id, status, started_at)
                 VALUES (%s, %s, %s, %s, NOW())
             """, (
@@ -103,7 +124,7 @@ class EmployeeKpiStorage:
             # 插入指标数据
             for metric in metrics:
                 cursor.execute("""
-                    INSERT INTO fliggy_employee_kpi_metrics
+                    INSERT INTO employee_kpi_metrics
                     (batch_id, biz_date, employee_name, service_count, avg_response_seconds,
                      reply_rate, conversion_rate, work_days, satisfaction_participation_rate,
                      customer_satisfaction_rate, very_satisfied_count, satisfied_count,
@@ -131,16 +152,8 @@ class EmployeeKpiStorage:
             conn.commit()
             return batch_id
 
-        except Exception as e:
+        except Exception:
             conn.rollback()
-            # 更新批次状态为失败
-            if 'batch_id' in locals():
-                cursor.execute("""
-                    UPDATE fliggy_employee_kpi_collection_batches
-                    SET status = 'error', error_message = %s, finished_at = NOW()
-                    WHERE id = %s
-                """, (str(e), batch_id))
-                conn.commit()
             raise
 
         finally:

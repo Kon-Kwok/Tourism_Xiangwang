@@ -22,9 +22,11 @@ class PrepareQianniuShopDataDailyRegistrationSqlTests(unittest.TestCase):
 
         sql = MODULE.build_upsert_sql(payload)
 
-        self.assertIn("INSERT INTO qianniu.qianniu_shop_data_daily_registration", sql)
-        self.assertIn("VALUES ('2026-04-10', 31)", sql)
-        self.assertIn("`关注店铺人数` = VALUES(`关注店铺人数`)", sql)
+        self.assertIn("INSERT INTO Xiangwang.shop_data_daily_registration", sql)
+        self.assertIn("SET `关注店铺人数` = NULL", sql)
+        self.assertIn("SET `关注店铺人数` = 31", sql)
+        self.assertIn("WHERE NOT EXISTS", sql)
+        self.assertNotIn("ON DUPLICATE KEY UPDATE", sql)
 
     def test_build_upsert_sql_supports_flat_payload(self):
         payload = {
@@ -34,7 +36,7 @@ class PrepareQianniuShopDataDailyRegistrationSqlTests(unittest.TestCase):
 
         sql = MODULE.build_upsert_sql(payload)
 
-        self.assertIn("VALUES ('2026-04-10', 31)", sql)
+        self.assertIn("SET `关注店铺人数` = 31", sql)
 
     def test_build_upsert_sql_treats_null_follow_count_as_zero(self):
         payload = {
@@ -44,7 +46,7 @@ class PrepareQianniuShopDataDailyRegistrationSqlTests(unittest.TestCase):
 
         sql = MODULE.build_upsert_sql(payload)
 
-        self.assertIn("VALUES ('2026-04-21', 0)", sql)
+        self.assertIn("SET `关注店铺人数` = 0", sql)
 
     def test_main_reads_stdin_and_writes_sql(self):
         payload = {
@@ -58,7 +60,7 @@ class PrepareQianniuShopDataDailyRegistrationSqlTests(unittest.TestCase):
             exit_code = MODULE.main()
 
         self.assertEqual(exit_code, 0)
-        self.assertIn("VALUES ('2026-04-10', 31)", stdout.getvalue())
+        self.assertIn("SET `关注店铺人数` = 31", stdout.getvalue())
 
 
 if __name__ == "__main__":

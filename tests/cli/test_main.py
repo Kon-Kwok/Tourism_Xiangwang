@@ -14,10 +14,74 @@ class UnifiedCliTests(unittest.TestCase):
 
         self.assertEqual(
             sorted(collector_action.choices.keys()),
-            ["fliggy-home", "fliggy-kpi", "fliggy-order-list", "shop-kpi-export", "shop-kpi-export-batch", "sycm"],
+            [
+                "alimama-daily",
+                "fliggy-home",
+                "fliggy-kpi",
+                "fliggy-order-list",
+                "fliggy-star-store",
+                "shop-kpi-export",
+                "shop-kpi-export-batch",
+                "sycm",
+            ],
         )
 
-    def test_fliggy_order_list_list_uses_defaults(self):
+    @mock.patch("tourism_automation.collectors.alimama_daily.cli.AlimamaDailyStorage")
+    @mock.patch("tourism_automation.collectors.alimama_daily.cli.collect_alimama_daily")
+    def test_alimama_daily_collect_accepts_save(self, mock_collect, mock_storage_cls):
+        parser = build_parser()
+        mock_collect.return_value = {
+            "status": "success",
+            "date_time": "2026-05-01",
+            "channels": {
+                "star_store": {"cost": 1, "imp": 2, "click": 3, "order_count": 4},
+                "tmall_express": {"cost": 5, "imp": 6, "click": 7, "order_count": 8},
+                "gravity_rubiks_cube": {"cost": 9, "imp": 10, "click": 11, "order_count": 12},
+                "wanxiangtai": {"cost": 13, "imp": 14, "click": 15, "order_count": 16},
+            },
+            "wanxiangtai_2_rows": {"小计": {}},
+            "missing_channels": [],
+        }
+        mock_storage_cls.return_value.save.return_value = {"tmall_express": True}
+
+        args = parser.parse_args(
+            [
+                "alimama-daily",
+                "collect",
+                "--date",
+                "2026-05-01",
+                "--save",
+                "--mysql-password",
+                "pw",
+                "--omit-raw",
+            ]
+        )
+        with mock.patch("sys.stdout", new_callable=io.StringIO):
+            exit_code = args.handler(args)
+
+        self.assertEqual(exit_code, 0)
+        mock_collect.assert_called_once_with(biz_date="2026-05-01")
+        mock_storage_cls.return_value.save.assert_called_once_with(mock_collect.return_value)
+
+    @mock.patch("tourism_automation.collectors.alimama_daily.cli.collect_alimama_daily")
+    def test_alimama_daily_collect_json_outputs_payload(self, mock_collect):
+        parser = build_parser()
+        mock_collect.return_value = {
+            "status": "success",
+            "date_time": "2026-05-01",
+            "channels": {},
+            "wanxiangtai_2_rows": {},
+            "missing_channels": [],
+        }
+
+        args = parser.parse_args(["alimama-daily", "collect", "--date", "2026-05-01", "--json", "--omit-raw"])
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            exit_code = args.handler(args)
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue())["date_time"], "2026-05-01")
+
+    def test_order_list_list_uses_defaults(self):
         parser = build_parser()
 
         args = parser.parse_args(["fliggy-order-list", "list"])
@@ -27,7 +91,7 @@ class UnifiedCliTests(unittest.TestCase):
 
     @mock.patch("tourism_automation.collectors.fliggy_order_list.cli.collect_order_list")
     @mock.patch("tourism_automation.collectors.fliggy_order_list.cli._now_local")
-    def test_fliggy_order_list_list_uses_yesterday_deal_range_defaults(self, mock_now, mock_collect):
+    def test_order_list_list_uses_yesterday_deal_range_defaults(self, mock_now, mock_collect):
         parser = build_parser()
         mock_now.return_value = datetime(2026, 4, 21, 8, 0, 0)
         mock_collect.return_value = {"summary": {}, "orders": [], "request_params": {}}
@@ -46,7 +110,7 @@ class UnifiedCliTests(unittest.TestCase):
         )
 
     @mock.patch("tourism_automation.collectors.fliggy_order_list.cli.collect_order_list")
-    def test_fliggy_order_list_list_accepts_explicit_deal_range(self, mock_collect):
+    def test_order_list_list_accepts_explicit_deal_range(self, mock_collect):
         parser = build_parser()
         mock_collect.return_value = {"summary": {}, "orders": [], "request_params": {}}
 
@@ -73,7 +137,7 @@ class UnifiedCliTests(unittest.TestCase):
         )
 
     @mock.patch("tourism_automation.collectors.fliggy_order_list.cli.collect_order_list")
-    def test_fliggy_order_list_list_passes_all_pages_flag(self, mock_collect):
+    def test_order_list_list_passes_all_pages_flag(self, mock_collect):
         parser = build_parser()
         mock_collect.return_value = {"summary": {}, "rows": []}
 

@@ -1,6 +1,6 @@
 #!/bin/bash
-# 三大核心业务一键采集脚本
-# 用途：一次性采集所有三个业务的数据
+# 四大核心业务一键采集脚本
+# 用途：一次性采集所有四个业务的数据
 # 使用：./scripts/all.sh YYYY-MM-DD
 
 set -e  # 遇到错误立即退出
@@ -16,7 +16,7 @@ DATE=$1
 # 打印欢迎信息
 echo -e "${GREEN}"
 echo "========================================"
-echo "   三大核心业务一键采集"
+echo "   四大核心业务一键采集"
 echo "   日期：$DATE"
 echo "========================================"
 echo -e "${NC}"
@@ -37,6 +37,11 @@ echo ""
 # 业务3: SYCM流量看板
 echo -e "${BLUE}[$(date +%H:%M:%S)] 业务3：SYCM流量看板${NC}"
 "$SCRIPT_DIR/sycm_flow.sh" "$DATE"
+echo ""
+
+# 业务4: 阿里妈妈投放日报
+echo -e "${BLUE}[$(date +%H:%M:%S)] 业务4：阿里妈妈投放日报${NC}"
+"$SCRIPT_DIR/alimama_daily.sh" "$DATE"
 echo ""
 
 # 计算耗时

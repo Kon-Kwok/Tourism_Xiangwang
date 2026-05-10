@@ -29,44 +29,46 @@ def build_upsert_sql(payload):
 -- SYCM流量监控数据
 -- 日期: {biz_date}
 
--- 更新飞猪店铺日度关键数据；当前线上表日期字段不是唯一键，不能依赖唯一键 upsert
-UPDATE qianniu_fliggy_shop_daily_key_data
+INSERT INTO shop_daily_key_data (日期, created_at)
+SELECT '{biz_date}', NOW()
+FROM DUAL
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM shop_daily_key_data
+    WHERE 日期 = '{biz_date}'
+);
+
+UPDATE shop_daily_key_data
+SET total_uv = NULL,
+    total_pv = NULL,
+    流量来源广告_uv = NULL,
+    流量来源平台_uv = NULL
+WHERE 日期 = '{biz_date}';
+
+UPDATE shop_daily_key_data
 SET total_uv = {_format_int(row.get('访客数'))},
     total_pv = {_format_int(row.get('浏览量'))},
     流量来源广告_uv = {_format_int(row.get('广告流量'))},
     流量来源平台_uv = {_format_int(row.get('平台流量'))}
 WHERE 日期 = '{biz_date}';
 
-INSERT INTO qianniu_fliggy_shop_daily_key_data
-(日期, total_uv, total_pv, 流量来源广告_uv, 流量来源平台_uv, created_at)
-SELECT
-    '{biz_date}',
-    {_format_int(row.get('访客数'))},
-    {_format_int(row.get('浏览量'))},
-    {_format_int(row.get('广告流量'))},
-    {_format_int(row.get('平台流量'))},
-    NOW()
-FROM DUAL
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM qianniu_fliggy_shop_daily_key_data
-    WHERE 日期 = '{biz_date}'
-);
-
 -- 写入店铺数据每日登记的关注店铺人数
-UPDATE qianniu_shop_data_daily_registration
-SET `关注店铺人数` = {follow_count}
-WHERE `日期` = '{biz_date}';
-
-INSERT INTO qianniu_shop_data_daily_registration
-(`日期`, `关注店铺人数`, created_at)
-SELECT '{biz_date}', {follow_count}, NOW()
+INSERT INTO shop_data_daily_registration (`日期`, created_at)
+SELECT '{biz_date}', NOW()
 FROM DUAL
 WHERE NOT EXISTS (
     SELECT 1
-    FROM qianniu_shop_data_daily_registration
+    FROM shop_data_daily_registration
     WHERE `日期` = '{biz_date}'
 );
+
+UPDATE shop_data_daily_registration
+SET `关注店铺人数` = NULL
+WHERE `日期` = '{biz_date}';
+
+UPDATE shop_data_daily_registration
+SET `关注店铺人数` = {follow_count}
+WHERE `日期` = '{biz_date}';
 """
 
 def main():

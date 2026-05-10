@@ -1,11 +1,11 @@
 ---
 name: daily-data-collection
-description: 飞猪业务日报数据采集技能。一键采集三大核心日报数据（赤兔KPI客服报表、飞猪订单列表、SYCM流量看板）。当用户需要"日报数据"、"昨日数据采集"或提及"KPI"、"订单"、"流量"等关键词时使用此技能。
+description: 飞猪业务日报数据采集技能。一键采集四大核心日报数据（赤兔KPI客服报表、飞猪订单列表、SYCM流量看板、阿里妈妈投放日报）。当用户需要"日报数据"、"昨日数据采集"、"5月1日日报"或提及"KPI"、"订单"、"流量"、"阿里妈妈"、"直通车"、"万相台"等关键词时使用此技能。
 ---
 
 # 每日数据采集技能
 
-一键采集三大核心日报数据：赤兔KPI客服报表、飞猪订单列表、SYCM流量看板。
+一键采集四大核心日报数据：赤兔KPI客服报表、飞猪订单列表、SYCM流量看板、阿里妈妈投放日报。
 
 ## 🚫 绝对禁止
 
@@ -34,6 +34,9 @@ cd ~/Tourism_Xiangwang
 
 # 采集指定日期
 ./scripts/all.sh 2026-04-30
+
+# 用户说“5月1日日报”时，解析为当年 2026-05-01
+./scripts/all.sh 2026-05-01
 ```
 
 ### 单独采集某个模块
@@ -49,6 +52,9 @@ cd ~/Tourism_Xiangwang
 
 # SYCM流量
 ./scripts/sycm_flow.sh 2026-04-30
+
+# 阿里妈妈投放日报（HTTP接口采集 + 入库）
+./scripts/alimama_daily.sh 2026-05-01
 ```
 
 ## 环境配置
@@ -88,13 +94,32 @@ export PASS="your_mysql_password"
 3. **三个网站已登录**
    - sycm.taobao.com、fsc.fliggy.com、kf.topchitu.com
 
-## 三大核心业务
+## 四大核心业务
 
 | 业务 | 原理 | 耗时 | 目标表 |
 |------|------|------|--------|
 | 赤兔KPI客服报表 | CDP 操控 Chrome 导出 Excel → 入库 | ~30s | `fliggy_customer_service_*` |
 | 飞猪订单列表 | Chrome cookie + HTTP API | ~5s | `fliggy_order_list` + `qianniu_*` |
 | SYCM流量看板 | Chrome cookie + HTTP API | ~5s | `qianniu_fliggy_shop_daily_key_data` |
+| 阿里妈妈投放日报 | Chrome cookie + HTTP API；必要时只用CDP发现一次性token | ~5s | `fliggy_star_store`、`fliggy_tmall_express`、`fliggy_gravity_rubiks_cube`、`fliggy_wanxiangtai`、`fliggy_wanxiangtai_2` |
+
+## 阿里妈妈投放日报
+
+触发方式：
+- “我要 5月1日的日报” → 执行 `./scripts/all.sh 2026-05-01`
+- “昨日日报” → 用系统昨日日期执行 `./scripts/all.sh YYYY-MM-DD`
+- 只更新投放报表 → 执行 `./scripts/alimama_daily.sh YYYY-MM-DD`
+
+HTTP 数据源：
+- 明星店铺/品销宝：`https://brandsearch.taobao.com/report/query/rptAdvertiserSubListNew.json`
+- 直通车、引力魔方、万相台/万相台2：`https://one.alimama.com/report/query.json`
+- 直通车取 `关键词推广`，引力魔方取 `人群推广`。
+- 万相台和万相台2是两张独立表；万相台2按 `数据源` 存 `超级短视频/超级直播/货品运营/全站推广/小计` 五行。
+
+历史 Excel 参考：
+- 项目根目录 `2026年阿里妈妈投放每日数据-更新到5.5(1).xlsx` 仅作为历史字段和公式口径参考。
+- 日报执行不更新 Excel，只通过 HTTP 接口取数并写入 MySQL。
+- 入库派生字段按历史 Excel 公式口径在代码中计算。
 
 ## 错误处理
 
@@ -102,6 +127,7 @@ export PASS="your_mysql_password"
 "数据库连接参数未配置" → 设置环境变量或创建 .env 文件
 "未找到店铺KPI页面"   → 在 Chrome 中打开 KPI 页面
 卡在"导出 Excel"      → 检查 Chrome 是否正常运行
+阿里妈妈提示未找到 one.alimama 页面 → 在统一 Chrome 中打开并登录万相台无界报表页
 其他错误              → 把错误信息报告给用户
 ```
 

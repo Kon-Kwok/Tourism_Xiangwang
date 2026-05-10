@@ -28,12 +28,11 @@ class PrepareQianniuShopDailyKeySqlTests(unittest.TestCase):
 
         sql = MODULE.build_upsert_sql(payload)
 
-        self.assertIn("INSERT INTO qianniu.qianniu_fliggy_shop_daily_key_data", sql)
-        self.assertIn("UPDATE qianniu.qianniu_fliggy_shop_daily_key_data", sql)
+        self.assertIn("UPDATE Xiangwang.shop_daily_key_data", sql)
         self.assertIn("total_bookings = 10", sql)
         self.assertIn("total_pax = 23.00", sql)
         self.assertIn("gmv = 90715.00", sql)
-        self.assertIn("SELECT '2026-04-20', 10, 23.00, 90715.00, NOW()", sql)
+        self.assertIn("SET total_bookings = NULL", sql)
         self.assertIn("WHERE NOT EXISTS", sql)
 
     def test_build_upsert_sql_rejects_multi_page_payload(self):
@@ -66,7 +65,7 @@ class PrepareQianniuShopDailyKeySqlTests(unittest.TestCase):
 
         sql = MODULE.build_upsert_sql(payload)
 
-        self.assertIn("SELECT '2026-04-07', 17, 49.00, 179551.00, NOW()", sql)
+        self.assertIn("total_bookings = 17", sql)
 
     def test_main_reads_stdin_and_writes_sql(self):
         payload = {
@@ -86,7 +85,7 @@ class PrepareQianniuShopDailyKeySqlTests(unittest.TestCase):
             exit_code = MODULE.main()
 
         self.assertEqual(exit_code, 0)
-        self.assertIn("SELECT '2026-04-20', 10, 23.00, 90715.00, NOW()", stdout.getvalue())
+        self.assertIn("total_bookings = 10", stdout.getvalue())
 
 
 if __name__ == "__main__":

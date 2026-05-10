@@ -38,11 +38,11 @@ class PrepareFliggyCustomerServiceSummarySqlTests(unittest.TestCase):
 
         sql = MODULE.build_upsert_sql(payload)
 
-        self.assertIn("INSERT INTO feizhu.fliggy_customer_service_performance_summary", sql)
+        self.assertIn("INSERT INTO Xiangwang.customer_service_performance_summary", sql)
         self.assertIn("('melissa', 98, 82, NULL, 83263.00, 23, 4, 8, '2026-04-20')", sql)
         self.assertNotIn("'汇总'", sql)
         self.assertNotIn("'均值'", sql)
-        self.assertIn("ON DUPLICATE KEY UPDATE", sql)
+        self.assertIn("WHERE `date_time` = '2026-04-20'", sql)
 
     def test_main_reads_stdin_and_writes_sql(self):
         payload = {
@@ -72,7 +72,7 @@ class PrepareFliggyCustomerServiceSummarySqlTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertIn("'james'", stdout.getvalue())
         self.assertIn("49728.00", stdout.getvalue())
-        self.assertIn("ON DUPLICATE KEY UPDATE", stdout.getvalue())
+        self.assertIn("INSERT INTO Xiangwang.customer_service_performance_summary", stdout.getvalue())
 
     def test_build_upsert_sql_deletes_day_when_report_is_empty(self):
         payload = {
@@ -87,7 +87,7 @@ class PrepareFliggyCustomerServiceSummarySqlTests(unittest.TestCase):
 
         self.assertEqual(
             sql,
-            "DELETE FROM feizhu.fliggy_customer_service_performance_summary\n"
+            "DELETE FROM Xiangwang.customer_service_performance_summary\n"
             "WHERE date_time = '2026-04-21';",
         )
 

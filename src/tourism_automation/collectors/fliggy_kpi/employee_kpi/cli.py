@@ -57,7 +57,7 @@ def run(args) -> int:
 
             # 如果需要保存到数据库
             if args.save:
-                storage = EmployeeKpiStorage(config={"host": "localhost", "user": "root", "database": "feizhu"})
+                storage = EmployeeKpiStorage(config={"host": "localhost", "user": "root", "database": "Xiangwang"})
                 storage.ensure_schema()
                 batch_id = storage.save(result)
                 result["batch_id"] = batch_id

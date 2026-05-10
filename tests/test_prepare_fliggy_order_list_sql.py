@@ -32,7 +32,8 @@ class PrepareFliggyOrderListSqlTests(unittest.TestCase):
         self.assertIn("item_title VARCHAR(300)", sql)
         self.assertIn("(order_id, item_title, package_type, buy_mount, actual_fee, order_time, status_text, order_date)", sql)
         self.assertIn("'SC260506 1D3人间升1D4人间 补差 668.98元'", sql)
-        self.assertIn("item_title = VALUES(item_title)", sql)
+        self.assertIn("DELETE FROM order_list WHERE order_date = '2026-04-16'", sql)
+        self.assertNotIn("ON DUPLICATE KEY UPDATE", sql)
 
 
 if __name__ == "__main__":

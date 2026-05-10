@@ -15,7 +15,7 @@ except ImportError:  # pragma: no cover
 
 SCHEMA_SQL = [
     """
-    CREATE TABLE IF NOT EXISTS sycm_collection_batches (
+    CREATE TABLE IF NOT EXISTS collection_batches (
         id BIGINT AUTO_INCREMENT PRIMARY KEY,
         page_code VARCHAR(64) NOT NULL,
         biz_date DATE NOT NULL,
@@ -27,7 +27,7 @@ SCHEMA_SQL = [
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='生意参谋采集批次';
     """,
     """
-    CREATE TABLE IF NOT EXISTS sycm_api_raw_payloads (
+    CREATE TABLE IF NOT EXISTS api_raw_payloads (
         batch_id BIGINT NOT NULL,
         endpoint_code VARCHAR(64) NOT NULL,
         payload_json LONGTEXT NOT NULL,
@@ -36,7 +36,7 @@ SCHEMA_SQL = [
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='生意参谋原始接口响应';
     """,
     """
-    CREATE TABLE IF NOT EXISTS sycm_homepage_metrics (
+    CREATE TABLE IF NOT EXISTS homepage_metrics (
         biz_date DATE NOT NULL,
         page_code VARCHAR(64) NOT NULL,
         shop_name VARCHAR(255) NOT NULL,
@@ -51,7 +51,7 @@ SCHEMA_SQL = [
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='生意参谋首页核心指标';
     """,
     """
-    CREATE TABLE IF NOT EXISTS sycm_homepage_trends (
+    CREATE TABLE IF NOT EXISTS homepage_trends (
         biz_date DATE NOT NULL,
         stat_date DATE NOT NULL,
         page_code VARCHAR(64) NOT NULL,
@@ -87,18 +87,44 @@ class MySQLSink:
     def write_home_collection(self, payload: Dict[str, object]) -> int:
         with self._connect() as conn:
             with conn.cursor() as cursor:
+                self._delete_existing_day(cursor, payload["metrics"])
                 batch_id = self._insert_batch(cursor, payload)
-                self._upsert_metrics(cursor, batch_id, payload["metrics"])
-                self._upsert_trends(cursor, batch_id, payload["trends"])
+                self._insert_metrics(cursor, batch_id, payload["metrics"])
+                self._insert_trends(cursor, batch_id, payload["trends"])
                 self._insert_raw_payloads(cursor, batch_id, payload["raw_payloads"])
             conn.commit()
         return batch_id
+
+    def _delete_existing_day(self, cursor, metrics: List[Dict[str, object]]) -> None:
+        first = metrics[0]
+        params = (first["biz_date"], first["page_code"], first["shop_name"])
+        cursor.execute(
+            "DELETE FROM homepage_metrics WHERE biz_date=%s AND page_code=%s AND shop_name=%s",
+            params,
+        )
+        cursor.execute(
+            "DELETE FROM homepage_trends WHERE biz_date=%s AND page_code=%s AND shop_name=%s",
+            params,
+        )
+        cursor.execute(
+            """
+            DELETE r
+            FROM api_raw_payloads r
+            JOIN collection_batches b ON b.id = r.batch_id
+            WHERE b.biz_date=%s AND b.page_code=%s AND b.shop_name=%s
+            """,
+            params,
+        )
+        cursor.execute(
+            "DELETE FROM collection_batches WHERE biz_date=%s AND page_code=%s AND shop_name=%s",
+            params,
+        )
 
     def _insert_batch(self, cursor, payload: Dict[str, object]) -> int:
         metrics = payload["metrics"]
         cursor.execute(
             """
-            INSERT INTO sycm_collection_batches (page_code, biz_date, shop_name, status, finished_at)
+            INSERT INTO collection_batches (page_code, biz_date, shop_name, status, finished_at)
             VALUES (%s, %s, %s, %s, %s)
             """,
             (
@@ -111,20 +137,12 @@ class MySQLSink:
         )
         return int(cursor.lastrowid)
 
-    def _upsert_metrics(self, cursor, batch_id: int, metrics: Iterable[Dict[str, object]]) -> None:
+    def _insert_metrics(self, cursor, batch_id: int, metrics: Iterable[Dict[str, object]]) -> None:
         cursor.executemany(
             """
-            INSERT INTO sycm_homepage_metrics
+            INSERT INTO homepage_metrics
             (biz_date, page_code, shop_name, metric_code, metric_value, cycle_crc, sync_crc, year_sync_crc, batch_id)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE
-            shop_name = VALUES(shop_name),
-            metric_value = VALUES(metric_value),
-            cycle_crc = VALUES(cycle_crc),
-            sync_crc = VALUES(sync_crc),
-            year_sync_crc = VALUES(year_sync_crc),
-            batch_id = VALUES(batch_id),
-            collected_at = CURRENT_TIMESTAMP
             """,
             [
                 (
@@ -142,19 +160,12 @@ class MySQLSink:
             ],
         )
 
-    def _upsert_trends(self, cursor, batch_id: int, trends: Iterable[Dict[str, object]]) -> None:
+    def _insert_trends(self, cursor, batch_id: int, trends: Iterable[Dict[str, object]]) -> None:
         cursor.executemany(
             """
-            INSERT INTO sycm_homepage_trends
+            INSERT INTO homepage_trends
             (biz_date, stat_date, page_code, shop_name, metric_code, self_value, rival_avg_value, rival_good_value, batch_id)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE
-            shop_name = VALUES(shop_name),
-            self_value = VALUES(self_value),
-            rival_avg_value = VALUES(rival_avg_value),
-            rival_good_value = VALUES(rival_good_value),
-            batch_id = VALUES(batch_id),
-            collected_at = CURRENT_TIMESTAMP
             """,
             [
                 (
@@ -175,9 +186,8 @@ class MySQLSink:
     def _insert_raw_payloads(self, cursor, batch_id: int, payloads: Dict[str, object]) -> None:
         cursor.executemany(
             """
-            INSERT INTO sycm_api_raw_payloads (batch_id, endpoint_code, payload_json)
+            INSERT INTO api_raw_payloads (batch_id, endpoint_code, payload_json)
             VALUES (%s, %s, %s)
-            ON DUPLICATE KEY UPDATE payload_json = VALUES(payload_json)
             """,
             [
                 (batch_id, endpoint_code, json.dumps(payload, ensure_ascii=False))

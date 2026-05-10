@@ -58,7 +58,7 @@ def _format_varchar(value) -> str:
 def _iter_customer_rows(payload: dict):
     for row in payload.get("rows", []):
         nickname = row.get("客服昵称")
-        if not nickname:
+        if not nickname or str(nickname).strip() in SUMMARY_NAMES:
             continue
         yield row
 
@@ -96,14 +96,14 @@ def build_upsert_sql(payload: dict) -> str:
 
     if not values:
         return (
-            "DELETE FROM feizhu.fliggy_customer_service_data_daily\n"
+            "DELETE FROM Xiangwang.customer_service_data_daily\n"
             f"WHERE `日期` = '{biz_date}';"
         )
 
     return (
-        "DELETE FROM feizhu.fliggy_customer_service_data_daily\n"
+        "DELETE FROM Xiangwang.customer_service_data_daily\n"
         f"WHERE `日期` = '{biz_date}';\n"
-        "INSERT INTO feizhu.fliggy_customer_service_data_daily\n"
+        "INSERT INTO Xiangwang.customer_service_data_daily\n"
         "(`日期`, `旺旺`, `接待人数`, `平均响应秒`, `回复率`, `询单最终付款成功率`, `上班天数`, `评价发送率`, `客户满意比`, `很满意`, `满意`, `一般`, `不满意`, `很不满意`)\n"
         "VALUES\n"
         + ",\n".join(values)
