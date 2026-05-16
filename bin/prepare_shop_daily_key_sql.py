@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate SQL for order summary fields in qianniu daily key data."""
+"""Generate SQL for order summary fields in Xiangwang daily key data."""
 
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ def build_upsert_sql(payload: dict) -> str:
     gmv = _format_decimal(summary.get("gmv"))
 
     return f"""
--- 飞猪订单汇总写入千牛飞猪店铺日度关键数据
+-- 飞猪订单汇总写入店铺日度关键数据
 -- 日期: {biz_date}
 
 INSERT INTO Xiangwang.shop_daily_key_data (日期, created_at)

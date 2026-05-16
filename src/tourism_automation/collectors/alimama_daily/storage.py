@@ -5,6 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from tourism_automation.shared.display_format import currency_text, percent_text
+
+
+PERCENT_FIELDS = {"ctr", "cvr", "cart_rate", "collection_cart_rate"}
+MONEY_FIELDS = {"cost", "sales", "cpc", "cpm", "asp", "cporder", "cpshopping_cart", "collection_cart_cost"}
+
 
 TABLE_CHANNELS = {
     "star_store": "star_store",
@@ -112,6 +118,14 @@ WANXIANGTAI_2_FIELDS = [
 ]
 
 
+def storage_value(field: str, value: Any) -> Any:
+    if field in PERCENT_FIELDS:
+        return percent_text(value)
+    if field in MONEY_FIELDS:
+        return currency_text(value)
+    return value
+
+
 @dataclass
 class AlimamaDailyStorage:
     config: dict[str, Any]
@@ -125,6 +139,9 @@ class AlimamaDailyStorage:
 
     def save(self, result: dict[str, Any]) -> dict[str, bool]:
         channels = result["channels"]
+        missing_channels = [channel for channel in TABLE_CHANNELS.values() if channel not in channels]
+        if missing_channels:
+            raise RuntimeError(f"Alimama daily result is missing channels: {', '.join(missing_channels)}")
         saved: dict[str, bool] = {}
         with self._connect() as conn:
             with conn.cursor() as cursor:
@@ -135,7 +152,7 @@ class AlimamaDailyStorage:
                 for table, channel in TABLE_CHANNELS.items():
                     fields = TABLE_FIELDS[table]
                     metrics = channels[channel]
-                    values = tuple(metrics[field] for field in fields)
+                    values = tuple(storage_value(field, metrics[field]) for field in fields)
                     columns = "date_time, " + ", ".join(fields)
                     placeholders = ", ".join(["%s"] * (len(fields) + 1))
                     cursor.execute(
@@ -151,7 +168,7 @@ class AlimamaDailyStorage:
     def _save_wanxiangtai_2_rows(self, cursor, result: dict[str, Any]) -> None:
         for data_source, metrics in result["wanxiangtai_2_rows"].items():
             row = {**metrics, "data_source": metrics.get("data_source", data_source)}
-            values = tuple(row[field] for field in WANXIANGTAI_2_FIELDS)
+            values = tuple(storage_value(field, row[field]) for field in WANXIANGTAI_2_FIELDS)
             columns = "date_time, " + ", ".join(WANXIANGTAI_2_FIELDS)
             placeholders = ", ".join(["%s"] * (len(WANXIANGTAI_2_FIELDS) + 1))
             cursor.execute(

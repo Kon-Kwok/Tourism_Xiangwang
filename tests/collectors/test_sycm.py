@@ -307,6 +307,47 @@ class SycmCliTests(unittest.TestCase):
             referer="https://sycm.taobao.com/flow/monitor/overview?dateRange=2026-04-20%7C2026-04-20%2C2026-04-19%7C2026-04-19&dateType=compareRange",
         )
 
+    @mock.patch("tourism_automation.collectors.sycm.cli.ShopSourceStorage")
+    @mock.patch("tourism_automation.collectors.sycm.cli.ShopSourceCollector")
+    @mock.patch("tourism_automation.collectors.sycm.cli.ChromeHttpClient")
+    def test_shop_source_collect_save_writes_to_xiangwang(
+        self,
+        mock_http_cls,
+        mock_shop_source_cls,
+        mock_storage_cls,
+    ):
+        mock_http_cls.from_local_chrome.return_value = mock.Mock()
+        mock_shop_source_cls.return_value.collect.return_value = {
+            "summary": {"collection_date": "2026-04-20", "shop_name": "SYCM"},
+            "metrics": [{"source_name": "广告流量", "uv": 10510}],
+        }
+        mock_storage_cls.return_value.save.return_value = 12
+
+        args = mock.Mock(
+            collector_command="shop-source",
+            shop_source_command="collect",
+            date="2026-04-20",
+            shop_name="SYCM",
+            active_key="item",
+            belong="all",
+            device="2",
+            save=True,
+        )
+
+        stdout = io.StringIO()
+        with redirect_stdout(stdout):
+            exit_code = sycm_cli.run(args)
+
+        self.assertEqual(exit_code, 0)
+        mock_storage_cls.assert_called_once_with(
+            config={"host": "localhost", "user": "root", "database": "Xiangwang"}
+        )
+        mock_storage_cls.return_value.ensure_schema.assert_called_once_with()
+        mock_storage_cls.return_value.save.assert_called_once()
+        payload = json.loads(stdout.getvalue())
+        self.assertTrue(payload["saved"])
+        self.assertEqual(payload["batch_id"], 12)
+
 
 
 class ChromeCookieDecryptTests(unittest.TestCase):

@@ -9,6 +9,7 @@ from urllib.parse import urlencode
 from tourism_automation.collectors.sycm.collector import HomePageCollector
 from tourism_automation.collectors.sycm.universal_client import UniversalSycmClient
 from tourism_automation.collectors.sycm.shop_source.collector import ShopSourceCollector
+from tourism_automation.collectors.sycm.shop_source.storage import ShopSourceStorage
 from tourism_automation.shared.chrome import ChromeHttpClient
 
 
@@ -19,7 +20,7 @@ def register_subparser(subparsers):
     # 健康检查
     collector_subparsers.add_parser("healthcheck", help="Check local Chrome login state availability")
 
-    # 首页数据采集（原有命令，保持向后兼容）
+    # 首页数据采集
     collect_home = collector_subparsers.add_parser("collect-home", help="Collect homepage data")
     collect_home.add_argument("--date", required=True, help="Business date in YYYY-MM-DD")
     collect_home.add_argument("--shop-name", default="SYCM", help="Shop name label in the output")
@@ -208,6 +209,12 @@ def run(args) -> int:
                         biz_date=args.date,
                         shop_name=args.shop_name
                     )
+                    if args.save:
+                        storage = ShopSourceStorage(config={"host": "localhost", "user": "root", "database": "Xiangwang"})
+                        storage.ensure_schema()
+                        batch_id = storage.save(result)
+                        result["batch_id"] = batch_id
+                        result["saved"] = True
                     print(json.dumps(result, ensure_ascii=False, indent=2))
                     return 0
                 except Exception as exc:

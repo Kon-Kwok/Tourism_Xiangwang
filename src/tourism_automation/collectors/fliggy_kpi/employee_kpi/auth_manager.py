@@ -8,13 +8,15 @@ from pathlib import Path
 from typing import Dict, Optional
 import time
 
+from tourism_automation.shared.chrome_cdp_script import resolve_chrome_cdp_script
+
 
 class AuthManager:
     """认证管理器"""
 
     def __init__(self, cache_dir: str = "/tmp"):
         self.cache_file = Path(cache_dir) / "fliggy_kpi_auth.json"
-        self.cdp_path = "/home/kk/Tourism_YingXiang/.claude/skills/chrome-cdp/scripts/cdp.mjs"
+        self.cdp_path = resolve_chrome_cdp_script()
 
     def get_auth_info(self, force_refresh: bool = False) -> Dict:
         """获取认证信息

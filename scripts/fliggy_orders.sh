@@ -1,7 +1,7 @@
 #!/bin/bash
 # 飞猪订单列表采集脚本
 # 用途：采集、转换、入库飞猪订单数据
-# 使用：./scripts/fliggy_orders.sh YYYY-MM-DD
+# 使用：./scripts/fliggy_orders.sh [YYYY-MM-DD]
 
 set -e  # 遇到错误立即退出
 
@@ -10,15 +10,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/common.sh"
 
 # 参数检查
-check_date_argument "$1"
-DATE=$1
+DATE="$(resolve_date_argument "$1")"
 
-# 数据库连接（使用环境变量或默认值）
-if [ -z "${MYSQL_CMD}" ]; then
-  MYSQL="mysql -h $HOST -P $PORT -u $USER -p$PASS"
-else
-  MYSQL="${MYSQL_CMD}"
-fi
+# 数据库连接
+MYSQL="$(init_mysql)"
 
 # 打印开始标题
 print_collection_start "飞猪订单列表采集" "$DATE"
@@ -43,20 +38,20 @@ print_success "采集到 $ORDER_COUNT 条订单"
 # 步骤2: 数据预处理
 print_step 2 4 "数据预处理"
 cat /tmp/orders_raw_$$.json | \
-  python3 bin/prepare_fliggy_order_list_for_storage.py > /tmp/orders_prep_$$.json
+  python3 bin/prepare_order_list_for_storage.py > /tmp/orders_prep_$$.json
 print_success "预处理完成"
 
 # 步骤3: 订单明细入库
 print_step 3 4 "订单明细入库"
 cat /tmp/orders_prep_$$.json | \
-  python3 bin/prepare_fliggy_order_list_sql.py | \
+  python3 bin/prepare_order_list_sql.py | \
   $MYSQL Xiangwang
 print_success "订单明细入库完成"
 
-# 步骤4: 订单汇总入库（total_bookings / total_pax / gmv）到千牛日度关键表
+# 步骤4: 订单汇总入库（total_bookings / total_pax / gmv）到店铺日度关键表
 print_step 4 4 "订单汇总入库"
 cat /tmp/orders_prep_$$.json | \
-  python3 bin/prepare_qianniu_shop_daily_key_sql.py | \
+  python3 bin/prepare_shop_daily_key_sql.py | \
   $MYSQL Xiangwang
 print_success "订单汇总入库完成"
 

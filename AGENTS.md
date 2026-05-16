@@ -28,7 +28,19 @@ Use concise, task-focused commit subjects that describe the current change, not 
 Do not commit cookies, local Chrome profiles, database dumps, or secrets. Browser automation depends on the long-lived debug Chrome session on port `9222`; reuse it instead of creating ad hoc profiles or closing the shared session during development. Prefer the shared `start-chrome-unified.sh` flow over task-specific browser profiles unless the repository is explicitly updated to support a new mode.
 
 ## Project-Specific Data Notes
-For this user environment, SYCM-related daily shop data is stored in the `qianniu` schema rather than a separate `sycm` schema. Current `qianniu.qianniu_fliggy_shop_daily_key_data` merge scripts use `UPDATE` followed by `INSERT ... WHERE NOT EXISTS` because the live `日期` index may be non-unique. Do not switch these pipelines back to `ON DUPLICATE KEY UPDATE` unless a unique key on `日期` has been verified. 飞猪订单汇总字段 `total_bookings`、`total_pax`、`gmv` require the extra conversion step `prepare_fliggy_order_list_for_storage.py` -> `prepare_qianniu_shop_daily_key_sql.py`, and order collection must use `--all-pages`.
+All daily collection writes in this repository target the unified `Xiangwang` schema and the tables defined in `sql/Xiangwang/Xiangwang.sql`. The current daily key table is `Xiangwang.shop_daily_key_data`; merge scripts use `UPDATE` followed by `INSERT ... WHERE NOT EXISTS` because the live `日期` index may be non-unique. Do not switch these pipelines back to `ON DUPLICATE KEY UPDATE` unless a unique key on `日期` has been verified. 飞猪订单汇总字段 `total_bookings`、`total_pax`、`gmv` require the extra conversion step `prepare_order_list_for_storage.py` -> `prepare_shop_daily_key_sql.py`, and order collection must use `--all-pages`.
+
+## Alimama Advertising Metric Formulas
+For 阿里妈妈投放 daily tables such as 明星店铺, 直通车, 引力魔方, 万相台, and 万相台2, use these Excel-compatible formulas:
+
+- `CTR 点击率 = Click / IMP`
+- `CPC 点击成本 = Cost / Click`
+- `CPM 拉新成本 = (Cost / IMP) * 1000`
+- `ROI 投资回报率 = Sales / Cost`
+- `CVR 点击转化率 = Order / Click`
+- `收藏加购成本 = Cost / (ShoppingCart + Bookmark-Product)`
+- `收藏加购量 = ShoppingCart + Bookmark-Product`
+- `收藏加购率 = 收藏加购量 / Click`
 
 
 ### 密码信息

@@ -9,6 +9,7 @@ import json
 
 from tourism_automation.collectors.fliggy_kpi.employee_kpi.client import EmployeeKpiClient
 from tourism_automation.collectors.fliggy_kpi.employee_kpi.normalize import normalize_employee_kpi_data
+from tourism_automation.shared.chrome_cdp_script import resolve_chrome_cdp_script
 
 
 @dataclass
@@ -82,7 +83,7 @@ class EmployeeKpiCollector:
             page_url = f"https://kf.topchitu.com/web/custom-kpi/employee-kpi?id={kpi_id}&wwt={wwt}"
 
             # 查找Chrome标签页
-            cdp_path = "/home/kk/Tourism_YingXiang/.claude/skills/chrome-cdp/scripts/cdp.mjs"
+            cdp_path = resolve_chrome_cdp_script()
 
             # 列出所有标签页，找到目标页面
             result = subprocess.run(
@@ -168,7 +169,7 @@ class EmployeeKpiCollector:
         import time
         import os
 
-        cdp_path = "/home/kk/Tourism_YingXiang/.claude/skills/chrome-cdp/scripts/cdp.mjs"
+        cdp_path = resolve_chrome_cdp_script()
 
         try:
             # 1. 列出标签页，找到目标页面

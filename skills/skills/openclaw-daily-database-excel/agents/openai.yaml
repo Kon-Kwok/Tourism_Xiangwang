@@ -1,0 +1,6 @@
+interface:
+  display_name: "Openclaw_daily_database_excel"
+  short_description: "导出 Xiangwang 当日数据 Excel"
+  default_prompt: "Use $openclaw-daily-database-excel to export today's Xiangwang database rows into an Excel workbook."
+policy:
+  allow_implicit_invocation: true

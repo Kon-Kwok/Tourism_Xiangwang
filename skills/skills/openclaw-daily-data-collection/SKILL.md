@@ -1,233 +1,222 @@
 ---
 name: openclaw-daily-data-collection
-description: 飞猪业务日报数据采集技能（Windows OpenClaw专用版）。在Windows环境下通过OpenClaw调用WSL中的采集脚本，一键采集四大核心日报数据。当用户在Windows下使用OpenClaw需要"日报数据"、"昨日数据采集"、"5月1日日报"或阿里妈妈投放日报时使用此技能。
+description: OpenClaw 侧调用飞猪业务四大日报采集。一键采集赤兔 KPI 客服报表、飞猪订单列表、SYCM 流量看板、阿里妈妈投放日报；当用户需要“日报数据”“昨日日报”“采集 x 日数据”或提及 KPI、订单、流量、阿里妈妈、直通车、万相台时使用。
 ---
 
-# 每日数据采集技能（Windows OpenClaw专用版）
+# OpenClaw 每日数据采集技能
 
-## 🎯 运行环境说明
+调用项目根目录的 `scripts/all.sh` 完成四大日报采集：赤兔 KPI 客服报表、飞猪订单列表、SYCM 流量看板、阿里妈妈投放日报。
 
-**本版本专为 Windows + OpenClaw 环境设计**：
-- **运行环境**：Windows 侧 OpenClaw
-- **执行方式**：Windows OpenClaw → WSL bash → Linux 采集脚本
-- **适用场景**：你在 Windows 下使用 OpenClaw，通过它调用 WSL 中的采集系统
+## 快速开始
 
-**架构图**：
-```
-Windows 侧                        WSL/Linux 侧
-─────────────────────────────────────────────────────
-OpenClaw Gateway                    ~/Tourism_Xiangwang/
-     ↓                                   ↓
-调用 run_all.sh                    执行采集脚本
-     ↓                                   ↓
-wsl bash project               实际数据采集工作
-     ↓
-返回结果到 OpenClaw
-```
-
-
-
-## 🚫 绝对禁止
-
-1. **不要修改项目代码** — 源码在正确环境下能正常工作，出错一定是环境问题
-2. **不要碰 Chrome** — 不要杀掉、重启、或自己启动 Chrome
-3. **不要深入调试** — 不要研究 Cookie 加密、不要写调试脚本，第 2 次失败就报告用户
-
-## 执行方式
-
-### OpenClaw 标准调用（推荐）
-
-在 Windows 下的 OpenClaw 中直接说：
-
-```
-"采集昨日数据"
-"采集 2026-04-30 的日报"
-"采集 5月1日的日报"
-"运行数据采集"
-```
-
-OpenClaw 会自动调用 WSL 中的采集脚本。
-
-### 手动测试（调试用）
-
-如果需要手动测试，可以在 Windows PowerShell 或 CMD 中：
-
-```powershell
-# 方式1：通过 WSL 调用（推荐）
-wsl bash ~/Tourism_Xiangwang/scripts/all.sh 2026-04-30
-
-# 方式2：使用 install.sh 生成的 run_all.sh
-wsl bash C:\Users\YourUsername\.openclaw\workspace\skills\openclaw-daily-data-collection\run_all.sh 2026-04-30
-```
-
-### 单独采集某个业务（高级用法）
-
-当需要单独调试某个模块时，可以进入 WSL 直接调用：
+所有命令都在项目根目录执行：
 
 ```bash
-# 在 WSL 中执行
 cd ~/Tourism_Xiangwang
 
-# 单独采集KPI报表
-./scripts/kpi_reports.sh 2026-04-30
+# 不传日期默认采集昨天
+./scripts/all.sh
 
-# 单独采集飞猪订单
-./scripts/fliggy_orders.sh 2026-04-30
+# 采集指定日期
+./scripts/all.sh 2026-05-01
+```
 
-# 单独采集SYCM流量
-./scripts/sycm_flow.sh 2026-04-30
+单独采集：
 
-# 单独采集阿里妈妈投放日报
+```bash
+./scripts/kpi_reports.sh 2026-05-01
+./scripts/fliggy_orders.sh 2026-05-01
+./scripts/sycm_flow.sh 2026-05-01
 ./scripts/alimama_daily.sh 2026-05-01
 ```
 
-**注意**：单独调用前需要在 WSL 中设置环境变量：
-```bash
-export HOST="your_mysql_host"
-export PORT="3306"
-export USER="your_mysql_user"
-export PASS="your_mysql_password"
-```
+## 日期规则
 
-## 安装方法（Windows 用户）
+- 日报采集必须固定为同一天：开始日期 = 结束日期 = `YYYY-MM-DD`。
+- 用户说“5月1日日报”时，按当前年份解析为 `YYYY-05-01`；没有日期时执行昨天。
+- 赤兔 KPI 三个报表都必须使用 `--date-mode day --date YYYY-MM-DD`，包括名字带“每周”的 `每周店铺个人数据` 和 `客服数据23年新`。
+- KPI 下载文件名必须包含 `YYYY-MM-DD至YYYY-MM-DD`。
 
-### 前提条件
+## 前置条件
 
-1. **Windows 电脑已安装 WSL2**（Ubuntu 推荐）
-2. **WSL2 中已配置项目**：`~/Tourism_Xiangwang`
-3. **已安装 OpenClaw**（Windows 侧）
-
-### 安装步骤
+- 使用统一 Chrome 调试窗口：`~/Tourism_Xiangwang/bin/start-chrome-unified.sh`
+- Chrome 里已登录 `sycm.taobao.com`、`fsc.fliggy.com`、`kf.topchitu.com`、`brandsearch.taobao.com` / `one.alimama.com`
+- 项目根目录 `.env` 已配置数据库连接，脚本会自动加载：
 
 ```bash
-# 1. 打开 WSL 终端（Windows Terminal 或 PowerShell 中输入 wsl）
-# 2. 进入项目目录
-cd ~/Tourism_Xiangwang
-
-# 3. 创建 .env 文件（数据库配置）
-cat > .env << EOF
-HOST=your_mysql_host
+HOST=localhost
 PORT=3306
-USER=your_mysql_user
+USER=remote_user
 PASS=your_mysql_password
-EOF
-
-# 4. 运行安装脚本
-bash skills/skills/openclaw-daily-data-collection/install.sh
-
-# 5. 重启 OpenClaw Gateway（Windows 侧）
 ```
 
-**install.sh 会自动**：
-- 检测 WSL 环境
-- 找到 Windows 侧的 OpenClaw workspace
-- 从 `.env` 读取数据库配置
-- 生成适配当前环境的 `run_all.sh`（在 WSL 和 Windows 间传递环境变量）
-- 将 skill 安装到 OpenClaw
+## 目标表
 
-## 前置条件（采集前检查）
+| 业务 | 目标表 |
+|---|---|
+| 赤兔KPI客服报表 | `Xiangwang.customer_service_data_daily`、`Xiangwang.customer_service_performance_summary`、`Xiangwang.customer_service_performance_workload_analysis` |
+| 飞猪订单列表 | `Xiangwang.order_list`、`Xiangwang.shop_daily_key_data` |
+| SYCM流量看板 | `Xiangwang.shop_daily_key_data`、`Xiangwang.shop_data_daily_registration` |
+| 阿里妈妈投放日报 | `Xiangwang.star_store`、`Xiangwang.tmall_express`、`Xiangwang.gravity_rubiks_cube`、`Xiangwang.wanxiangtai`、`Xiangwang.wanxiangtai_2` |
 
-在 Windows 侧使用 OpenClaw 调用前，确保 WSL 中环境就绪：
+`Xiangwang.shop_daily_key_data` 的 `日期` 索引可能非唯一，写入必须保持 `UPDATE` 后 `INSERT ... WHERE NOT EXISTS`，不要改回 `ON DUPLICATE KEY UPDATE`。
 
-**1. Chrome 在 WSL2 中运行**
-   - 在 WSL 终端中启动：`~/Tourism_Xiangwang/bin/start-chrome-unified.sh`
-   - 检查：`ps aux | grep remote-debugging-port=9222`
+## 关键口径
 
-**2. 赤兔 KPI 页面已在 Chrome 中打开**
-   - Chrome 中必须有 `kf.topchitu.com/web/custom-kpi/employee-kpi?id=1721` 标签页
+飞猪订单：
 
-**3. 四个网站已登录**（在 WSL 的 Chrome 中）
-   - sycm.taobao.com、fsc.fliggy.com、kf.topchitu.com、one.alimama.com/branding.taobao.com
+- 必须带 `--all-pages`。
+- 订单明细进入 `Xiangwang.order_list`。
+- 订单汇总必须先经过 `bin/prepare_order_list_for_storage.py`，再由 `bin/prepare_shop_daily_key_sql.py` 写入 `total_bookings`、`total_pax`、`gmv`。
+- `gmv` 按 `actual_fee` 汇总；补差/尾款类订单只计入 `gmv`，不计入舱位和人数。
 
-## 四大核心业务
+阿里妈妈投放：
 
-| 业务 | 原理 | 耗时 | 目标表 |
-|------|------|------|--------|
-| 赤兔KPI客服报表 | CDP 操控 Chrome 导出 Excel → 入库 | ~30s | `fliggy_customer_service_*` |
-| 飞猪订单列表 | Chrome cookie + HTTP API | ~5s | `fliggy_order_list` + `qianniu_*` |
-| SYCM流量看板 | Chrome cookie + HTTP API | ~5s | `qianniu_fliggy_shop_daily_key_data` |
-| 阿里妈妈投放日报 | Chrome cookie + HTTP API；必要时只用CDP发现一次性token | ~5s | `fliggy_star_store`、`fliggy_tmall_express`、`fliggy_gravity_rubiks_cube`、`fliggy_wanxiangtai`、`fliggy_wanxiangtai_2` |
+- 明星店铺接口：`https://brandsearch.taobao.com/report/adrQuery/rptCampaignList2.json`
+- one.alimama 场景接口：`https://one.alimama.com/report/query.json`
+- 日期参数 `startTime/startdate = endTime/enddate = YYYY-MM-DD`。
+- 固定口径：`effectConversionCycle/effectEqual = 3`，归因 `click`。
+- 不给明星店铺接口传错误 `csrfID`。
+- 入库时展示型字段按文本保存：`cost/sales/cpc/cpm/asp/cporder/cpshopping_cart/collection_cart_cost` 记为 `￥1,234.56`，`ctr/cvr/cart_rate/collection_cart_rate` 记为 `5.00%`；`roi` 和各类数量字段仍保留数值。
 
-## 阿里妈妈投放日报
+阿里妈妈公式按同一行基础字段计算：
 
-当用户说“我要 x月x日的日报”或“昨日日报”时：
-- 先解析成 `YYYY-MM-DD`。
-- OpenClaw 通过 WSL 执行 `~/Tourism_Xiangwang/scripts/all.sh YYYY-MM-DD`。
-- 只更新投放日报时执行 `~/Tourism_Xiangwang/scripts/alimama_daily.sh YYYY-MM-DD`。
+- `CTR 点击率 = Click / IMP`
+- `CPC 点击成本 = Cost / Click`
+- `CPM 拉新成本 = (Cost / IMP) * 1000`
+- `ROI 投资回报率 = Sales / Cost`
+- `CVR 点击转化率 = Order / Click`
+- `收藏加购量 = ShoppingCart + Bookmark-Product`
+- `收藏加购成本 = Cost / 收藏加购量`
+- `收藏加购率 = 收藏加购量 / Click`
 
-采集方式：
-- 明星店铺使用品销宝 HTTP 接口。
-- 直通车/引力魔方/万相台使用万相台无界 `report/query.json` HTTP POST。
-- 万相台和万相台2是两张独立表；万相台2按 `数据源` 存 `超级短视频/超级直播/货品运营/全站推广/小计` 五行。
-- 历史 Excel 只作为字段和公式口径参考；执行不更新 Excel。
-- 入库派生字段按历史 Excel 公式口径在代码中计算。
+## 验证 SQL
 
-## 错误处理
+```sql
+SET @biz_date = '2026-05-01';
 
+-- 总览：四大业务目标表是否都有当日数据
+SELECT 'KPI-人均日接入' AS item, COUNT(*) AS rows_count
+FROM Xiangwang.customer_service_data_daily
+WHERE 日期 = @biz_date
+UNION ALL
+SELECT 'KPI-每周店铺个人数据', COUNT(*)
+FROM Xiangwang.customer_service_performance_summary
+WHERE date_time = @biz_date
+UNION ALL
+SELECT 'KPI-客服数据23年新', COUNT(*)
+FROM Xiangwang.customer_service_performance_workload_analysis
+WHERE date_time = @biz_date
+UNION ALL
+SELECT '飞猪订单明细', COUNT(*)
+FROM Xiangwang.order_list
+WHERE order_date = @biz_date
+UNION ALL
+SELECT 'SYCM-店铺日度关键表', COUNT(*)
+FROM Xiangwang.shop_daily_key_data
+WHERE 日期 = @biz_date
+UNION ALL
+SELECT 'SYCM-关注店铺人数表', COUNT(*)
+FROM Xiangwang.shop_data_daily_registration
+WHERE 日期 = @biz_date
+UNION ALL
+SELECT '阿里妈妈-明星店铺', COUNT(*)
+FROM Xiangwang.star_store
+WHERE date_time = @biz_date
+UNION ALL
+SELECT '阿里妈妈-直通车', COUNT(*)
+FROM Xiangwang.tmall_express
+WHERE date_time = @biz_date
+UNION ALL
+SELECT '阿里妈妈-引力魔方', COUNT(*)
+FROM Xiangwang.gravity_rubiks_cube
+WHERE date_time = @biz_date
+UNION ALL
+SELECT '阿里妈妈-万相台', COUNT(*)
+FROM Xiangwang.wanxiangtai
+WHERE date_time = @biz_date
+UNION ALL
+SELECT '阿里妈妈-万相台2', COUNT(*)
+FROM Xiangwang.wanxiangtai_2
+WHERE date_time = @biz_date;
+
+-- KPI：客服三张表的核心指标
+SELECT 日期, COUNT(*) AS 客服数, SUM(接待人数) AS 接待人数合计,
+       ROUND(AVG(平均响应秒), 2) AS 平均响应秒
+FROM Xiangwang.customer_service_data_daily
+WHERE 日期 = @biz_date
+GROUP BY 日期;
+
+SELECT date_time, COUNT(*) AS 客服数, SUM(咨询人数) AS 咨询人数合计,
+       SUM(接待人数) AS 接待人数合计, SUM(销售额) AS 销售额合计, SUM(订单数) AS 订单数合计
+FROM Xiangwang.customer_service_performance_summary
+WHERE date_time = @biz_date
+GROUP BY date_time;
+
+SELECT date_time, COUNT(*) AS 客服数, SUM(咨询人数) AS 咨询人数合计,
+       SUM(接待人数) AS 接待人数合计, SUM(总消息) AS 总消息合计,
+       ROUND(AVG(首次响应秒), 2) AS 平均首次响应秒
+FROM Xiangwang.customer_service_performance_workload_analysis
+WHERE date_time = @biz_date
+GROUP BY date_time;
+
+-- 飞猪订单：明细与店铺日度汇总是否一致落库
+SELECT order_date, COUNT(*) AS 订单数, SUM(buy_mount) AS 件数合计, SUM(actual_fee) AS gmv明细合计
+FROM Xiangwang.order_list
+WHERE order_date = @biz_date
+GROUP BY order_date;
+
+SELECT 日期, total_bookings, total_pax, gmv
+FROM Xiangwang.shop_daily_key_data
+WHERE 日期 = @biz_date;
+
+-- SYCM：流量与关注店铺人数
+SELECT 日期, total_uv, total_pv, 流量来源广告_uv, 流量来源平台_uv
+FROM Xiangwang.shop_daily_key_data
+WHERE 日期 = @biz_date;
+
+SELECT 日期, 关注店铺人数
+FROM Xiangwang.shop_data_daily_registration
+WHERE 日期 = @biz_date;
+
+-- 阿里妈妈：四个主渠道核心字段
+SELECT '明星店铺' AS channel, date_time, cost, imp, click, order_count, sales, ctr, cpc, cpm, roi, cvr
+FROM Xiangwang.star_store
+WHERE date_time = @biz_date
+UNION ALL
+SELECT '直通车', date_time, cost, imp, click, order_count, sales, ctr, cpc, NULL AS cpm, roi, cvr
+FROM Xiangwang.tmall_express
+WHERE date_time = @biz_date
+UNION ALL
+SELECT '引力魔方', date_time, cost, imp, click, order_count, sales, ctr, cpc, cpm, roi, cvr
+FROM Xiangwang.gravity_rubiks_cube
+WHERE date_time = @biz_date
+UNION ALL
+SELECT '万相台', date_time, cost, imp, click, order_count, sales, ctr, cpc, cpm, roi, cvr
+FROM Xiangwang.wanxiangtai
+WHERE date_time = @biz_date;
+
+-- 阿里妈妈：万相台2分数据源明细，正常应含超级短视频/超级直播/货品运营/全站推广/小计
+SELECT date_time, data_source, cost, imp, click, order_count, sales,
+       shopping_cart, bookmark_product, collection_cart_count, ctr, cpc, cpm, roi, cvr
+FROM Xiangwang.wanxiangtai_2
+WHERE date_time = @biz_date
+ORDER BY FIELD(data_source, '超级短视频', '超级直播', '货品运营', '全站推广', '小计'), data_source;
+
+-- 店铺日度关键表：推广渠道汇总字段
+SELECT 日期,
+       pingxiaobao_cost, pingxiaobao_imp, pingxiaobao_click,
+       tmall_express_cost, tmall_express_imp, tmall_express_click,
+       gravity_rubiks_cube_cost, gravity_rubiks_cube_imp, gravity_rubiks_cube_click,
+       mansa_dae_cost, mansa_dae_views, mansa_dae_click,
+       cost_total, imp_total, click_total
+FROM Xiangwang.shop_daily_key_data
+WHERE 日期 = @biz_date;
 ```
-"数据库连接参数未配置" → 检查 .env 文件是否存在于 ~/Tourism_Xiangwang/
-"latin-1 codec" 错误  → 检查 run_all.sh 是否正确生成（重新运行 install.sh）
-"未找到店铺KPI页面"   → 在 WSL Chrome 中打开 KPI 页面
-阿里妈妈 token 发现失败 → 在 WSL Chrome 中打开并登录 one.alimama.com 万相台报表页
-卡在"导出 Excel"      → 检查 WSL Chrome 是否正常运行
-WSL 执行权限错误      → 在 WSL 中运行：chmod +x scripts/*.sh
-其他错误              → 把错误信息报告给用户
-```
 
-## 技术实现细节
+## 故障处理
 
-### 跨平台调用架构
-
-**Windows → WSL 调用链**：
-```
-Windows OpenClaw
-    ↓ (调用)
-run_all.sh (OpenClaw workspace)
-    ↓ (wsl bash)
-cd ~/Tourism_Xiangwang
-source .env (加载环境变量)
-    ↓
-./scripts/all.sh
-    ↓
-实际数据采集（在 WSL 中执行）
-```
-     
-**环境变量传递**：
-- Windows 侧：无需设置环境变量
-- WSL 侧：`run_all.sh` 自动从 `.env` 加载数据库配置
-- Chrome 环境：自动检测并继承 Wayland/DBus 环境变量
-
-### 公共函数库设计
-
-所有脚本共享 `scripts/lib/common.sh` 公共函数库，提供统一功能：
-
-**1. 参数检查**
-- `check_date_argument`：验证日期参数格式
-- `init_mysql`：初始化数据库连接
-
-**2. 统一输出格式**
-- `print_collection_start/end`：打印采集标题
-- `print_step`：打印步骤进度
-- `print_success/error`：打印成功/错误消息
-
-**3. 文件验证**
-- `check_file_not_empty`：检查文件是否存在且非空
-
-
-## 文件结构
-
-```
-openclaw-daily-data-collection/
-├── SKILL.md        # 本文件（Windows OpenClaw 使用指南）
-├── install.sh      # 安装脚本（生成 Windows↔WSL 桥接）
-├── run_all.sh      # 运行入口（install.sh 生成，位于 OpenClaw workspace）
-└── scripts/        # 数据采集脚本（在 WSL 中执行）
-    ├── lib/
-    │   └── common.sh             # 公共函数库
-    ├── all.sh                    # 一键采集主脚本
-    ├── run_all_env.sh            # WSL 环境适配器
-    ├── kpi_reports.sh            # KPI 报表采集
-    ├── fliggy_orders.sh          # 飞猪订单采集
-    ├── sycm_flow.sh             # SYCM 流量采集
-    └── alimama_daily.sh         # 阿里妈妈投放日报采集
-```
+- 某个业务失败时，先单独运行对应脚本复现。
+- Chrome 未登录或页面过期时，复用统一调试窗口重新登录。
+- 不要关闭共享 Chrome 调试会话；需要启动时使用 `bin/start-chrome-unified.sh`。
+- 数据库连接失败时先检查 `.env`，当前本机优先使用 `HOST=localhost`。

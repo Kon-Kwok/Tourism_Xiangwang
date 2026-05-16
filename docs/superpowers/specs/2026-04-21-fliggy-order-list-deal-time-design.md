@@ -42,7 +42,7 @@ python3 -m tourism_automation.cli.main fliggy-order-list list \
 
 选择理由：
 
-- 对现有命令兼容，已有调用方不需要调整子命令结构
+- 保持现有命令形式，已有调用方不需要调整子命令结构
 - 能覆盖“默认今日”和“精确到秒的自定义区间”两种需求
 - 改动面集中在 CLI 和请求层，风险最小
 

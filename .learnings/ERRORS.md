@@ -51,7 +51,7 @@ The full order ingestion pipeline wrote zeroed daily metrics because the upstrea
 ```
 
 ### Context
-- Command/operation attempted: `python3 -m tourism_automation.cli.main fliggy-order-list list --all-pages ... | python3 bin/prepare_fliggy_order_list_for_storage.py | python3 bin/prepare_qianniu_shop_daily_key_sql.py | python3 bin/exec_mysql_sql.py`
+- Command/operation attempted: `python3 -m tourism_automation.cli.main fliggy-order-list list --all-pages ... | python3 bin/prepare_order_list_for_storage.py | python3 bin/prepare_shop_daily_key_sql.py | python3 bin/exec_mysql_sql.py`
 - Input or parameters used: `2026-04-20 00:00:00` to `2026-04-20 23:59:39`
 - Environment details if relevant: live Fliggy order-list HTTP endpoint using Chrome-backed cookies
 - Summary or redacted excerpt of relevant output: the same request succeeded on a later retry and returned 18 orders, proving the zero result was transient failure rather than genuine no-data
@@ -82,17 +82,17 @@ ValueError: invalid integer value: None
 ```
 
 ### Context
-- Command/operation attempted: `python3 -m tourism_automation.cli.main sycm flow-monitor --date 2026-04-21 --shop-name 'SYCM' | python3 bin/prepare_qianniu_shop_data_daily_registration_sql.py | python3 bin/exec_mysql_sql.py`
+- Command/operation attempted: `python3 -m tourism_automation.cli.main sycm flow-monitor --date 2026-04-21 --shop-name 'SYCM' | python3 bin/prepare_shop_data_daily_registration_sql.py | python3 bin/exec_mysql_sql.py`
 - Input or parameters used: 2026-04-21 yesterday-report pipeline
 - Environment details if relevant: live SYCM flow-monitor payload returned a single row with all metric fields `null`
-- Summary or redacted excerpt of relevant output: `prepare_qianniu_shop_data_daily_registration_sql.py` attempted `Decimal(str(None))` and aborted before SQL execution
+- Summary or redacted excerpt of relevant output: `prepare_shop_data_daily_registration_sql.py` attempted `Decimal(str(None))` and aborted before SQL execution
 
 ### Suggested Fix
 Treat `None` as `0` for `关注店铺人数` so the registration table stays aligned with the existing flow-monitor numeric-null handling.
 
 ### Metadata
 - Reproducible: yes
-- Related Files: bin/prepare_qianniu_shop_data_daily_registration_sql.py, tests/test_prepare_qianniu_shop_data_daily_registration_sql.py
+- Related Files: bin/prepare_shop_data_daily_registration_sql.py, tests/test_prepare_shop_data_daily_registration_sql.py
 - See Also: LRN-20260422-001
 
 ---
@@ -113,7 +113,7 @@ ValueError: no customer rows found for insertion
 ```
 
 ### Context
-- Command/operation attempted: `python3 -m tourism_automation.cli.main shop-kpi-export --report-name '人均日接入' --date-mode day --date 2026-04-21 --json | python3 bin/prepare_fliggy_customer_service_data_daily_sql.py | python3 bin/exec_mysql_sql.py`
+- Command/operation attempted: `python3 -m tourism_automation.cli.main shop-kpi-export --report-name '人均日接入' --date-mode day --date 2026-04-21 --json | python3 bin/prepare_customer_service_data_daily_sql.py | python3 bin/exec_mysql_sql.py`
 - Input or parameters used: 2026-04-21 yesterday-report pipeline
 - Environment details if relevant: exported JSON was valid and contained `row_count = 0`, `rows = []`
 - Summary or redacted excerpt of relevant output: SQL generation aborted even though the export succeeded and the correct semantic result for the date was “no rows”
@@ -123,7 +123,7 @@ Emit a date-scoped `DELETE` when the report is empty and let orchestration valid
 
 ### Metadata
 - Reproducible: yes
-- Related Files: bin/prepare_fliggy_customer_service_data_daily_sql.py, bin/prepare_fliggy_customer_service_workload_sql.py, bin/prepare_fliggy_customer_service_summary_sql.py, /home/kk/.codex/skills/yesterday-report-ingestion/scripts/run_yesterday_report.py
+- Related Files: bin/prepare_customer_service_data_daily_sql.py, bin/prepare_customer_service_performance_workload_sql.py, bin/prepare_customer_service_performance_summary_sql.py, /home/kk/.codex/skills/yesterday-report-ingestion/scripts/run_yesterday_report.py
 - See Also: LRN-20260422-002
 
 ---

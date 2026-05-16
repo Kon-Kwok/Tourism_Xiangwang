@@ -1,14 +1,13 @@
 #!/bin/bash
 # 阿里妈妈投放日报采集脚本
-# 使用：./scripts/alimama_daily.sh YYYY-MM-DD
+# 使用：./scripts/alimama_daily.sh [YYYY-MM-DD]
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/common.sh"
 
-check_date_argument "$1"
-DATE=$1
+DATE="$(resolve_date_argument "$1")"
 
 print_collection_start "阿里妈妈投放日报采集" "$DATE"
 

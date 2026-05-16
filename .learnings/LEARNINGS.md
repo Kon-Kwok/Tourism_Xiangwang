@@ -128,14 +128,14 @@ Keep transient-failure retry logic in the order-list client and treat `success=f
 When `sycm flow-monitor` returns `关注店铺人数 = null`, the daily-registration ingestion should coerce it to `0` instead of failing integer conversion.
 
 ### Details
-During the 2026-04-21 daily run, the flow-monitor payload for `SYCM` returned a single row with every metric set to `null`. The key-data pipeline already normalized that shape to `0` for numeric fields, but `prepare_qianniu_shop_data_daily_registration_sql.py` still treated `None` as an invalid integer and aborted the run. Aligning the registration path with the existing flow-monitor SQL behavior fixed the inconsistency.
+During the 2026-04-21 daily run, the flow-monitor payload for `SYCM` returned a single row with every metric set to `null`. The key-data pipeline already normalized that shape to `0` for numeric fields, but `prepare_shop_data_daily_registration_sql.py` still treated `None` as an invalid integer and aborted the run. Aligning the registration path with the existing flow-monitor SQL behavior fixed the inconsistency.
 
 ### Suggested Action
-Treat `None` follow counts as `0` in `prepare_qianniu_shop_data_daily_registration_sql.py` and keep a regression test for the null-input case.
+Treat `None` follow counts as `0` in `prepare_shop_data_daily_registration_sql.py` and keep a regression test for the null-input case.
 
 ### Metadata
 - Source: simplify-and-harden
-- Related Files: bin/prepare_qianniu_shop_data_daily_registration_sql.py, tests/test_prepare_qianniu_shop_data_daily_registration_sql.py
+- Related Files: bin/prepare_shop_data_daily_registration_sql.py, tests/test_prepare_shop_data_daily_registration_sql.py
 - Tags: sycm, qianniu, null-handling, ingestion
 - Pattern-Key: harden.null_numeric_source_value
 - Recurrence-Count: 1
@@ -167,7 +167,7 @@ For the three customer-service SQL builders, emit `DELETE ... WHERE date = <biz_
 
 ### Metadata
 - Source: simplify-and-harden
-- Related Files: bin/prepare_fliggy_customer_service_data_daily_sql.py, bin/prepare_fliggy_customer_service_workload_sql.py, bin/prepare_fliggy_customer_service_summary_sql.py, /home/kk/.codex/skills/yesterday-report-ingestion/scripts/run_yesterday_report.py
+- Related Files: bin/prepare_customer_service_data_daily_sql.py, bin/prepare_customer_service_performance_workload_sql.py, bin/prepare_customer_service_performance_summary_sql.py, /home/kk/.codex/skills/yesterday-report-ingestion/scripts/run_yesterday_report.py
 - Tags: topchitu, empty-report, sql, ingestion
 - Pattern-Key: harden.empty_export_zero_row_day
 - Recurrence-Count: 1

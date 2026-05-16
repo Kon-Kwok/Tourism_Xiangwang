@@ -29,23 +29,23 @@ def build_upsert_sql(payload):
 -- SYCM流量监控数据
 -- 日期: {biz_date}
 
-INSERT INTO shop_daily_key_data (日期, created_at)
+INSERT INTO Xiangwang.shop_daily_key_data (日期, created_at)
 SELECT '{biz_date}', NOW()
 FROM DUAL
 WHERE NOT EXISTS (
     SELECT 1
-    FROM shop_daily_key_data
+    FROM Xiangwang.shop_daily_key_data
     WHERE 日期 = '{biz_date}'
 );
 
-UPDATE shop_daily_key_data
+UPDATE Xiangwang.shop_daily_key_data
 SET total_uv = NULL,
     total_pv = NULL,
     流量来源广告_uv = NULL,
     流量来源平台_uv = NULL
 WHERE 日期 = '{biz_date}';
 
-UPDATE shop_daily_key_data
+UPDATE Xiangwang.shop_daily_key_data
 SET total_uv = {_format_int(row.get('访客数'))},
     total_pv = {_format_int(row.get('浏览量'))},
     流量来源广告_uv = {_format_int(row.get('广告流量'))},
@@ -53,20 +53,20 @@ SET total_uv = {_format_int(row.get('访客数'))},
 WHERE 日期 = '{biz_date}';
 
 -- 写入店铺数据每日登记的关注店铺人数
-INSERT INTO shop_data_daily_registration (`日期`, created_at)
+INSERT INTO Xiangwang.shop_data_daily_registration (`日期`, created_at)
 SELECT '{biz_date}', NOW()
 FROM DUAL
 WHERE NOT EXISTS (
     SELECT 1
-    FROM shop_data_daily_registration
+    FROM Xiangwang.shop_data_daily_registration
     WHERE `日期` = '{biz_date}'
 );
 
-UPDATE shop_data_daily_registration
+UPDATE Xiangwang.shop_data_daily_registration
 SET `关注店铺人数` = NULL
 WHERE `日期` = '{biz_date}';
 
-UPDATE shop_data_daily_registration
+UPDATE Xiangwang.shop_data_daily_registration
 SET `关注店铺人数` = {follow_count}
 WHERE `日期` = '{biz_date}';
 """

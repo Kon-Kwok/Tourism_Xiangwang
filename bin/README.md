@@ -2,11 +2,21 @@
 
 ## 核心脚本（必需）
 
-### Chrome启动（1个）
+### Chrome启动与保活（2个）
 - **start-chrome-unified.sh** - 统一Chrome调试窗口启动脚本
   - 端口：9222
   - 配置目录：`~/.config/google-chrome-debug`
   - 用途：所有数据采集的前置条件
+
+- **refresh_chrome_tabs.py** - 业务标签页自动刷新守护脚本
+  - 调用方式：由 `start-chrome-unified.sh` 自动拉起
+  - 默认间隔：30分钟
+  - 用途：保持 SYCM、飞猪、赤兔、阿里妈妈等页面 Cookie 活跃
+
+### KPI页面准备（1个）
+- **ensure_topchitu_custom_report.py**
+  - 功能：确保赤兔自定义 KPI 页面已打开到指定报表
+  - 调用方式：由 `scripts/kpi_reports.sh` 自动调用
 
 ### 数据转换流程（8个）
 
@@ -17,35 +27,35 @@
   - 输出：JSON（summary + rows）
 
 #### 赤兔KPI转SQL（3个报表）
-1. **prepare_fliggy_customer_service_data_daily_sql.py**
+1. **prepare_customer_service_data_daily_sql.py**
    - 报表：人均日接入（id=1721）
-   - 目标表：`fliggy_customer_service_data_daily`
+   - 目标表：`Xiangwang.customer_service_data_daily`
 
-2. **prepare_fliggy_customer_service_summary_sql.py**
+2. **prepare_customer_service_performance_summary_sql.py**
    - 报表：每周店铺个人数据（id=1996）
-   - 目标表：`fliggy_customer_service_performance_summary`
+   - 目标表：`Xiangwang.customer_service_performance_summary`
 
-3. **prepare_fliggy_customer_service_workload_sql.py**
+3. **prepare_customer_service_performance_workload_sql.py**
    - 报表：客服数据23年新（id=2496）
-   - 目标表：`fliggy_customer_service_performance_workload_analysis`
+   - 目标表：`Xiangwang.customer_service_performance_workload_analysis`
 
 #### 飞猪订单处理（3个）
-- **prepare_fliggy_order_list_for_storage.py**
+- **prepare_order_list_for_storage.py**
   - 功能：订单数据预处理（按“通兑”和“N人房”规则计算 `total_booking`、`total_pax`，并汇总 `gmv`）
   
-- **prepare_fliggy_order_list_sql.py**
+- **prepare_order_list_sql.py**
   - 功能：将订单JSON转换为SQL
-  - 目标表：`feizhu.fliggy_order_list`
+  - 目标表：`Xiangwang.order_list`
 
-- **prepare_qianniu_shop_daily_key_sql.py**
+- **prepare_shop_daily_key_sql.py**
   - 功能：将订单预处理后的汇总指标转换为SQL
-  - 目标表：`qianniu.qianniu_fliggy_shop_daily_key_data`
+  - 目标表：`Xiangwang.shop_daily_key_data`
   - 字段：`total_bookings`、`total_pax`、`gmv`
 
 #### SYCM流量（1个）
 - **prepare_sycm_flow_sql.py**
   - 功能：将SYCM流量JSON转换为SQL
-  - 目标表：`qianniu.qianniu_fliggy_shop_daily_key_data`
+  - 目标表：`Xiangwang.shop_daily_key_data`、`Xiangwang.shop_data_daily_registration`
 
 ### 数据库初始化（1个）
 - **setup_database.py**
@@ -68,8 +78,8 @@ sleep 10
 # 步骤3：转换和入库
 EXCEL=$(ls -t ~/Downloads/自定义报表*2026-04-24至2026-04-24.xlsx | head -1)
 python3 bin/prepare_shop_kpi_excel_to_json.py "$EXCEL" | \
-  python3 bin/prepare_fliggy_customer_service_data_daily_sql.py | \
-  mysql -h 172.28.190.60 -P 3306 -u remote_user -pTourism2024 feizhu
+  python3 bin/prepare_customer_service_data_daily_sql.py | \
+  mysql -h "$HOST" -P "$PORT" -u "$USER" -p"$PASS" Xiangwang
 ```
 
 ### 业务2：飞猪订单列表
@@ -80,13 +90,13 @@ python3 -m tourism_automation.cli.main fliggy-order-list list \
   --deal-start "2026-04-24 00:00:00" \
   --deal-end "2026-04-24 23:59:59" > /tmp/orders_raw.json
 
-python3 bin/prepare_fliggy_order_list_for_storage.py < /tmp/orders_raw.json > /tmp/orders_prep.json
+python3 bin/prepare_order_list_for_storage.py < /tmp/orders_raw.json > /tmp/orders_prep.json
 
-python3 bin/prepare_fliggy_order_list_sql.py < /tmp/orders_prep.json | \
-  mysql -h 172.28.190.60 -P 3306 -u remote_user -pTourism2024 feizhu
+python3 bin/prepare_order_list_sql.py < /tmp/orders_prep.json | \
+  mysql -h "$HOST" -P "$PORT" -u "$USER" -p"$PASS" Xiangwang
 
-python3 bin/prepare_qianniu_shop_daily_key_sql.py < /tmp/orders_prep.json | \
-  mysql -h 172.28.190.60 -P 3306 -u remote_user -pTourism2024 qianniu
+python3 bin/prepare_shop_daily_key_sql.py < /tmp/orders_prep.json | \
+  mysql -h "$HOST" -P "$PORT" -u "$USER" -p"$PASS" Xiangwang
 ```
 
 ### 业务3：SYCM流量看板
@@ -95,7 +105,7 @@ python3 bin/prepare_qianniu_shop_daily_key_sql.py < /tmp/orders_prep.json | \
 python3 -m tourism_automation.cli.main sycm flow-monitor \
   --date 2026-04-24 --shop-name "皇家加勒比国际游轮旗舰店" | \
   python3 bin/prepare_sycm_flow_sql.py | \
-  mysql -h 172.28.190.60 -P 3306 -u remote_user -pTourism2024 qianniu
+  mysql -h "$HOST" -P "$PORT" -u "$USER" -p"$PASS" Xiangwang
 ```
 
 ---
@@ -111,7 +121,8 @@ python3 -m tourism_automation.cli.main sycm flow-monitor \
 
 **原因**：已被 `start-chrome-unified.sh` 统一取代
 
-### 测试/临时脚本（2个）
+### 测试/临时脚本（3个）
+- compare_alimama_excel_http.py
 - test_kpi_reports.sh
 - test_mysql_connection.py
 
@@ -125,11 +136,11 @@ python3 -m tourism_automation.cli.main sycm flow-monitor \
 
 **原因**：一次性初始化工具，不是日常操作
 
-### 千牛旧手动导入（2个）
-- prepare_qianniu_shop_daily_key_flow_monitor_sql.py
-- prepare_qianniu_shop_data_daily_registration_sql.py
+### 店铺数据辅助脚本（2个）
+- prepare_shop_daily_key_flow_monitor_sql.py
+- prepare_shop_data_daily_registration_sql.py
 
-**原因**：已被自动化采集取代；`prepare_qianniu_shop_daily_key_sql.py` 当前已恢复为订单汇总入库的必要脚本。
+**原因**：主流程使用 `prepare_sycm_flow_sql.py` 一次性写入流量和关注店铺人数，不再保留拆分入口。
 
 ### 批量脚本（1个）
 - download_all_kpi_reports.sh
@@ -167,4 +178,4 @@ python3 -m tourism_automation.cli.main sycm flow-monitor \
 ---
 
 **最后更新**: 2026-04-25
-**脚本总数**: 10个（精简后）
+**脚本总数**: 12个（精简后）

@@ -49,7 +49,7 @@ python3 -m tourism_automation.cli.main sycm collect-home --date 2026-04-19 --sho
 python3 -m tourism_automation.cli.main fliggy-home collect-home --date 2026-04-19 --shop-name "皇家加勒比国际游轮旗舰店"
 ```
 
-## 兼容与运行
+## 运行方式
 
 为避免必须先手工设置 `PYTHONPATH`，仓库根目录提供自动把 `src/` 加入模块搜索路径的运行时适配。
 

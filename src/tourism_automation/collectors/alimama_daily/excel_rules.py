@@ -54,9 +54,6 @@ def calculate_excel_metrics(
 ) -> dict[str, Any]:
     metrics = normalize_base_metrics(row, date_time=date_time)
     metrics.update(_same_row_metrics(metrics))
-    if sheet == "gravity_rubiks_cube" and previous_row:
-        previous = normalize_base_metrics(previous_row, date_time=date_time)
-        metrics["cpm"] = ratio(decimal_or_zero(previous["cost"]) * Decimal("1000"), previous["imp"], "0.01")
     return _select_fields(metrics, sheet)
 
 

@@ -5,6 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from tourism_automation.shared.display_format import currency_text, percent_text
+
+
+PERCENT_FIELDS = {"ctr", "cvr", "cart_rate"}
+MONEY_FIELDS = {"cost", "sales", "cpc", "cpm", "asp", "cporder", "cpshopping_cart"}
+
 
 @dataclass
 class FliggyStarStoreStorage:
@@ -49,21 +55,29 @@ class FliggyStarStoreStorage:
 
 def _metric_values(metrics: dict[str, Any]) -> tuple[Any, ...]:
     return (
-        metrics["cost"],
+        _storage_value("cost", metrics["cost"]),
         metrics["imp"],
         metrics["click"],
         metrics["order_count"],
-        metrics["sales"],
+        _storage_value("sales", metrics["sales"]),
         metrics["shopping_cart"],
         metrics["bookmark_product"],
         metrics["bookmark_store"],
-        metrics["ctr"],
-        metrics["cpc"],
-        metrics["cpm"],
+        _storage_value("ctr", metrics["ctr"]),
+        _storage_value("cpc", metrics["cpc"]),
+        _storage_value("cpm", metrics["cpm"]),
         metrics["roi"],
-        metrics["cvr"],
-        metrics["asp"],
-        metrics["cporder"],
-        metrics["cpshopping_cart"],
-        metrics["cart_rate"],
+        _storage_value("cvr", metrics["cvr"]),
+        _storage_value("asp", metrics["asp"]),
+        _storage_value("cporder", metrics["cporder"]),
+        _storage_value("cpshopping_cart", metrics["cpshopping_cart"]),
+        _storage_value("cart_rate", metrics["cart_rate"]),
     )
+
+
+def _storage_value(field: str, value: Any) -> Any:
+    if field not in PERCENT_FIELDS or value is None:
+        if field in MONEY_FIELDS:
+            return currency_text(value)
+        return value
+    return percent_text(value)

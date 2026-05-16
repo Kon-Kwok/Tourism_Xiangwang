@@ -5,6 +5,10 @@ import json
 import sys
 from decimal import Decimal
 
+
+TARGET_TABLE = "Xiangwang.order_list"
+
+
 def _quote_string(value):
     if value in (None, ""):
         return "NULL"
@@ -32,6 +36,7 @@ def _format_int(value):
 def build_upsert_sql(payload):
     summary = payload.get("summary", {})
     rows = payload.get("rows", [])
+    biz_date = (summary.get("deal_start", "") or summary.get("biz_date", "") or summary.get("date", "") or summary.get("日期", "")).split()[0]
 
     values = []
     for row in rows:
@@ -48,22 +53,43 @@ def build_upsert_sql(payload):
                 actual_fee,
                 _quote_string(row.get("order_time")),
                 _quote_string(row.get("status_text")),
-                _quote_string(summary.get("deal_start", "").split()[0]),  # 提取日期
+                _quote_string(biz_date),
             ])
             + ")"
         )
 
     if not values:
-        return "-- 没有数据需要入库\n"
+        return f"""
+-- 飞猪订单数据
+-- 日期: {biz_date}
+-- 订单数: {summary.get('order_count')}
+
+CREATE TABLE IF NOT EXISTS {TARGET_TABLE} (
+    order_id VARCHAR(50) PRIMARY KEY,
+    item_title VARCHAR(300),
+    package_type VARCHAR(200),
+    buy_mount INT,
+    actual_fee DECIMAL(10,2),
+    order_time DATETIME,
+    status_text VARCHAR(50),
+    order_date DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+DELETE FROM {TARGET_TABLE} WHERE order_date = '{biz_date}';
+
+-- 没有订单明细需要入库
+"""
 
     return f"""
 -- 飞猪订单数据
--- 日期: {summary.get('deal_start', '').split()[0]}
+-- 日期: {biz_date}
 -- 订单数: {summary.get('order_count')}
 -- GMV: {summary.get('gmv')}
 
 -- 创建表（如果不存在）
-CREATE TABLE IF NOT EXISTS order_list (
+CREATE TABLE IF NOT EXISTS {TARGET_TABLE} (
     order_id VARCHAR(50) PRIMARY KEY,
     item_title VARCHAR(300),
     package_type VARCHAR(200),
@@ -77,10 +103,10 @@ CREATE TABLE IF NOT EXISTS order_list (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 清理当天旧数据，避免重复入库
-DELETE FROM order_list WHERE order_date = '{summary.get('deal_start', '').split()[0]}';
+DELETE FROM {TARGET_TABLE} WHERE order_date = '{biz_date}';
 
 -- 插入数据
-INSERT INTO order_list
+INSERT INTO {TARGET_TABLE}
 (order_id, item_title, package_type, buy_mount, actual_fee, order_time, status_text, order_date)
 VALUES
 {',\n'.join(values)};

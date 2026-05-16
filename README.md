@@ -8,22 +8,22 @@
 
 通过CDP自动化导出Excel报表，转换为JSON并入库。
 
-- **人均日接入**（id=1721）→ `fliggy_customer_service_data_daily`
-- **每周店铺个人数据**（id=1996）→ `fliggy_customer_service_performance_summary`
-- **客服数据23年新**（id=2496）→ `fliggy_customer_service_performance_workload_analysis`
+- **人均日接入**（id=1721）→ `Xiangwang.customer_service_data_daily`
+- **每周店铺个人数据**（id=1996）→ `Xiangwang.customer_service_performance_summary`
+- **客服数据23年新**（id=2496）→ `Xiangwang.customer_service_performance_workload_analysis`
 
 ### 2. 飞猪订单列表
 
 HTTP + Cookie采集订单数据，支持时间范围筛选、全页采集、订单明细入库，并将订单汇总指标写入千牛日度关键表。
 
-→ `feizhu.fliggy_order_list`
-→ `qianniu.qianniu_fliggy_shop_daily_key_data`（`total_bookings`、`total_pax`、`gmv`）
+→ `Xiangwang.order_list`
+→ `Xiangwang.shop_daily_key_data`（`total_bookings`、`total_pax`、`gmv`）
 
 ### 3. SYCM流量看板
 
 采集生意参谋流量监控数据（访客数、浏览量、广告/平台流量），写入同一张千牛日度关键表。
 
-→ `qianniu.qianniu_fliggy_shop_daily_key_data`
+→ `Xiangwang.shop_daily_key_data`
 
 ## 🚀 快速开始
 
@@ -95,8 +95,7 @@ docs/                      # 详细文档
 
 ## 📊 数据库表结构
 
-- **feizhu数据库**：客服KPI、订单数据
-- **qianniu数据库**：店铺数据、流量数据、SYCM数据
+- **Xiangwang数据库**：客服KPI、订单数据、店铺数据、流量数据、SYCM数据
 
 详见 `sql/` 目录中的建表SQL。
 

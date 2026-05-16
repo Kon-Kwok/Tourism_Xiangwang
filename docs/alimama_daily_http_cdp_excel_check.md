@@ -11,7 +11,7 @@
 - HTTP 使用本机 Chrome 登录态 Cookie。
 - 品销宝 CDP 页面实际请求包含 `rptCampaignList2.json`，当前代码仍会在报告中暴露与 Excel 的差异。
 - 万相台2 小计按当天 4 条明细重新汇总，不读取 Excel 小计缓存值。
-- 引力魔方 CPM 按 Excel 公式的上一行依赖计算参考值。
+- 投放日报公式按基础字段同一行计算，CPM = Cost / IMP * 1000。
 
 ## 差异汇总
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-飞猪/千牛电商数据自动化采集系统，通过复用本机 Chrome 登录态自动采集网页数据并存储到 MySQL 数据库。
+飞猪/千牛电商数据自动化采集系统，通过复用本机 Chrome 登录态自动采集网页数据并存储到 MySQL 数据库的 `Xiangwang` 统一 schema。
 
 **核心特性**:
 - 复用本机 Chrome 登录态
@@ -28,14 +28,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # 连接到MySQL
 sudo mysql
 
-# 连接到指定数据库
-sudo mysql qianniu    # 千牛数据库
-sudo mysql feizhu     # 飞猪数据库
+# 连接到统一业务数据库
+sudo mysql Xiangwang
 ```
 
 ### 数据库口径补充
-- 当前这套业务里，用户口径的 `SYCM` 日度店铺数据对应的是 `qianniu` 库，不是单独的 `sycm` 库。
-- `qianniu.qianniu_fliggy_shop_daily_key_data` 这种按日期汇总多来源数据的表，当前脚本使用 `UPDATE` 后接 `INSERT ... WHERE NOT EXISTS` 合并同日数据，因为线上 `日期` 可能只是普通索引。只有确认 `日期` 已有唯一键时，才能改回 `ON DUPLICATE KEY UPDATE`。
+- 所有日报链路写入 `Xiangwang`，目标表以 `sql/Xiangwang/Xiangwang.sql` 为准。
+- `Xiangwang.shop_daily_key_data` 这种按日期汇总多来源数据的表，当前脚本使用 `UPDATE` 后接 `INSERT ... WHERE NOT EXISTS` 合并同日数据，因为线上 `日期` 可能只是普通索引。只有确认 `日期` 已有唯一键时，才能改回 `ON DUPLICATE KEY UPDATE`。
 
 ## 核心架构
 
@@ -140,22 +139,19 @@ python3 bin/setup_database.py
 
 ```bash
 # 查看采集批次记录
-sudo mysql -e "SELECT * FROM sycm_collection_batches ORDER BY started_at DESC LIMIT 10;"
-
-# 查看原始API响应
-sudo mysql -e "SELECT * FROM sycm_api_raw_payloads WHERE batch_id = <batch_id>;"
+sudo mysql Xiangwang -e "SELECT * FROM collection_batches ORDER BY started_at DESC LIMIT 10;"
 
 # 查看采集的指标数据
-sudo mysql -e "SELECT * FROM sycm_homepage_metrics WHERE biz_date = '2026-04-19';"
+sudo mysql Xiangwang -e "SELECT * FROM homepage_metrics WHERE biz_date = '2026-04-19';"
 
 # 查看飞猪客服日数据
-sudo mysql feizhu -e "SELECT * FROM fliggy_customer_service_data_daily WHERE 日期 = '2026-04-24';"
+sudo mysql Xiangwang -e "SELECT * FROM customer_service_data_daily WHERE 日期 = '2026-04-24';"
 
 # 查看飞猪客服绩效汇总
-sudo mysql feizhu -e "SELECT * FROM fliggy_customer_service_performance_summary WHERE date_time = '2026-04-24';"
+sudo mysql Xiangwang -e "SELECT * FROM customer_service_performance_summary WHERE date_time = '2026-04-24';"
 
 # 查看飞猪客服工作量分析
-sudo mysql feizhu -e "SELECT * FROM fliggy_customer_service_performance_workload_analysis WHERE date_time = '2026-04-24';"
+sudo mysql Xiangwang -e "SELECT * FROM customer_service_performance_workload_analysis WHERE date_time = '2026-04-24';"
 ```
 
 ### 赤兔KPI三个报表完整流程
@@ -177,12 +173,12 @@ python3 bin/prepare_shop_kpi_excel_to_json.py \
 
 # 步骤3: JSON转换为SQL并入库
 cat result/kpi1_人均日接入.json | \
-  python3 bin/prepare_fliggy_customer_service_data_daily_sql.py | \
-  sudo mysql feizhu
+  python3 bin/prepare_customer_service_data_daily_sql.py | \
+  sudo mysql Xiangwang
 ```
 
-**对应表**: `feizhu.fliggy_customer_service_data_daily`
-**数据脚本**: `bin/prepare_fliggy_customer_service_data_daily_sql.py`
+**对应表**: `Xiangwang.customer_service_data_daily`
+**数据脚本**: `bin/prepare_customer_service_data_daily_sql.py`
 
 #### 2. 每周店铺个人数据报表（日报采集按单日导出）
 
@@ -199,12 +195,12 @@ python3 bin/prepare_shop_kpi_excel_to_json.py \
 
 # 步骤3: JSON转换为SQL并入库
 cat result/kpi2_每周店铺个人数据.json | \
-  python3 bin/prepare_fliggy_customer_service_summary_sql.py | \
-  sudo mysql feizhu
+  python3 bin/prepare_customer_service_performance_summary_sql.py | \
+  sudo mysql Xiangwang
 ```
 
-**对应表**: `feizhu.fliggy_customer_service_performance_summary`
-**数据脚本**: `bin/prepare_fliggy_customer_service_summary_sql.py`
+**对应表**: `Xiangwang.customer_service_performance_summary`
+**数据脚本**: `bin/prepare_customer_service_performance_summary_sql.py`
 
 #### 3. 客服数据23年新报表（工作量分析，日报采集按单日导出）
 
@@ -221,12 +217,12 @@ python3 bin/prepare_shop_kpi_excel_to_json.py \
 
 # 步骤3: JSON转换为SQL并入库
 cat result/kpi3_客服数据23年新.json | \
-  python3 bin/prepare_fliggy_customer_service_workload_sql.py | \
-  sudo mysql feizhu
+  python3 bin/prepare_customer_service_performance_workload_sql.py | \
+  sudo mysql Xiangwang
 ```
 
-**对应表**: `feizhu.fliggy_customer_service_performance_workload_analysis`
-**数据脚本**: `bin/prepare_fliggy_customer_service_workload_sql.py`
+**对应表**: `Xiangwang.customer_service_performance_workload_analysis`
+**数据脚本**: `bin/prepare_customer_service_performance_workload_sql.py`
 
 #### 批量导出脚本
 
@@ -250,17 +246,17 @@ python3 -m tourism_automation.cli.main fliggy-order-list list \
 
 # 步骤2: 数据预处理（计算 total_bookings、total_pax、gmv）
 cat result/orders_raw.json | \
-  python3 bin/prepare_fliggy_order_list_for_storage.py > result/orders_prepared.json
+  python3 bin/prepare_order_list_for_storage.py > result/orders_prepared.json
 
 # 步骤3: 订单明细入库
 cat result/orders_prepared.json | \
-  python3 bin/prepare_fliggy_order_list_sql.py | \
-  mysql feizhu
+  python3 bin/prepare_order_list_sql.py | \
+  mysql Xiangwang
 
-# 步骤4: 订单汇总入库千牛日度关键表
+# 步骤4: 订单汇总入库店铺日度关键表
 cat result/orders_prepared.json | \
-  python3 bin/prepare_qianniu_shop_daily_key_sql.py | \
-  mysql qianniu
+  python3 bin/prepare_shop_daily_key_sql.py | \
+  mysql Xiangwang
 ```
 
 ### 生意参谋数据入库
@@ -273,72 +269,64 @@ python3 -m tourism_automation.cli.main sycm collect-home \
   --date 2026-04-24 \
   --shop-name "皇家加勒比国际游轮旗舰店"
 
-# 数据自动存储到 qianniu.sycm_homepage_metrics 等表
+# 数据自动存储到 Xiangwang.homepage_metrics 等表
 ```
 
-**对应表**: `qianniu.sycm_homepage_metrics`, `qianniu.sycm_homepage_trends` 等
+**对应表**: `Xiangwang.homepage_metrics`, `Xiangwang.homepage_trends` 等
 
-### 千牛日度数据入库
+### 店铺日度数据入库
 
-千牛数据库包含手动登记数据，也包含日报自动采集写入的日度关键数据：
+统一数据库包含手动登记数据，也包含日报自动采集写入的日度关键数据：
 
 #### 1. 店铺数据每日登记
 
 ```bash
-# 假设已有Excel数据文件，转换为JSON后处理
-# 对应脚本: bin/prepare_qianniu_shop_data_daily_registration_sql.py
+# 假设已有SYCM流量JSON，统一转换为SQL后处理
 
 cat shop_data_daily.json | \
-  python3 bin/prepare_qianniu_shop_data_daily_registration_sql.py | \
-  sudo mysql qianniu
+  python3 bin/prepare_sycm_flow_sql.py | \
+  sudo mysql Xiangwang
 ```
 
-**对应表**: `qianniu.qianniu_shop_data_daily_registration`
+**对应表**: `Xiangwang.shop_data_daily_registration`
 
 #### 2. 飞猪店铺日度关键数据
 
 ```bash
 # 包含订单汇总等多来源数据汇总
-# 对应脚本: bin/prepare_qianniu_shop_daily_key_sql.py
+# 对应脚本: bin/prepare_shop_daily_key_sql.py
 
 cat orders_prepared.json | \
-  python3 bin/prepare_qianniu_shop_daily_key_sql.py | \
-  sudo mysql qianniu
+  python3 bin/prepare_shop_daily_key_sql.py | \
+  sudo mysql Xiangwang
 ```
 
-**对应表**: `qianniu.qianniu_fliggy_shop_daily_key_data`
+**对应表**: `Xiangwang.shop_daily_key_data`
 
 **重要说明**：
 - 该表按日期汇总多来源数据
-- 当前脚本使用 `UPDATE` 后接 `INSERT ... WHERE NOT EXISTS`，兼容 `日期` 不是唯一键的线上表
+- 当前脚本使用 `UPDATE` 后接 `INSERT ... WHERE NOT EXISTS`，适配 `日期` 不是唯一键的线上表
 - 如果后续改成 `ON DUPLICATE KEY UPDATE`，必须先确认 `日期` 字段具备唯一键（不只是普通索引）
 
 ## 数据库结构
 
-### 自动采集数据表（SYCM）
+### 统一数据库表
 
-- `sycm_collection_batches`: 采集批次记录
-- `sycm_api_raw_payloads`: 原始API响应
-- `sycm_homepage_metrics`: 首页核心指标
-- `sycm_homepage_trends`: 首页趋势序列
-.rf
-### 手动导入数据表
-
-#### 千牛数据库 (qianniu) - 2张表
-- `qianniu_shop_data_daily_registration`: 店铺数据每日登记
-- `qianniu_fliggy_shop_daily_key_data`: 飞猪店铺日度关键数据
-
-#### 飞猪数据库 (feizhu) - 10张表
-- `fliggy_wanxiangtai`: 万相台
-- `fliggy_customer_service_data_daily`: 客服数据汇总-日数据（人均日接入）
-- `fliggy_customer_service_data_weekly`: 客服数据汇总-周数据
-- `fliggy_customer_service_performance_workload_analysis`: 客服绩效-工作量分析（客服数据23年新）
-- `fliggy_customer_service_performance_summary`: 客服绩效-汇总（每周店铺个人数据）
-- `fliggy_gravity_rubiks_cube`: 引力魔方
-- `fliggy_star_store`: 明星店铺
-- `fliggy_tmall_express`: 直通车
-- `fliggy_order_list`: 飞猪订单列表（自动采集）
-- `sycm`: 生意参谋数据（自动采集）
+- `collection_batches`: 生意参谋采集批次记录
+- `homepage_metrics`: 生意参谋首页核心指标
+- `homepage_trends`: 生意参谋首页趋势序列
+- `customer_service_data_daily`: 客服数据汇总-日数据（人均日接入）
+- `customer_service_data_weekly`: 客服数据汇总-周数据
+- `customer_service_performance_summary`: 客服绩效-汇总（每周店铺个人数据）
+- `customer_service_performance_workload_analysis`: 客服绩效-工作量分析（客服数据23年新）
+- `order_list`: 飞猪订单列表
+- `shop_daily_key_data`: 店铺日度关键数据
+- `shop_data_daily_registration`: 店铺数据每日登记
+- `star_store`: 明星店铺
+- `tmall_express`: 直通车
+- `gravity_rubiks_cube`: 引力魔方
+- `wanxiangtai`: 万相台
+- `wanxiangtai_2`: 万相台2
 
 详细表结构参见 `sql/` 目录下的SQL文件。
 
@@ -440,26 +428,26 @@ chrome --user-data-dir=/home/kk/.config/google-chrome
 
 **赤兔KPI三个报表对应三个SQL生成脚本**：
 
-1. **`bin/prepare_fliggy_customer_service_data_daily_sql.py`**
+1. **`bin/prepare_customer_service_data_daily_sql.py`**
    - 报表：人均日接入
-   - 目标表：`feizhu.fliggy_customer_service_data_daily`
+   - 目标表：`Xiangwang.customer_service_data_daily`
    - 字段：日期、旺旺、接待人数、平均响应秒、回复率等
 
-2. **`bin/prepare_fliggy_customer_service_summary_sql.py`**
+2. **`bin/prepare_customer_service_performance_summary_sql.py`**
    - 报表：每周店铺个人数据
-   - 目标表：`feizhu.fliggy_customer_service_performance_summary`
+   - 目标表：`Xiangwang.customer_service_performance_summary`
    - 字段：旺旺昵称、咨询人数、接待人数、询单人数、销售额等
 
-3. **`bin/prepare_fliggy_customer_service_workload_sql.py`**
+3. **`bin/prepare_customer_service_performance_workload_sql.py`**
    - 报表：客服数据23年新
-   - 目标表：`feizhu.fliggy_customer_service_performance_workload_analysis`
+   - 目标表：`Xiangwang.customer_service_performance_workload_analysis`
    - 字段：旺旺昵称、咨询人数、接待人数、直接/转入/转出人数、消息数等
 
 **其他数据处理脚本**：
 
-- **`bin/prepare_fliggy_order_list_for_storage.py`**：飞猪订单列表数据预处理
-- **`bin/prepare_qianniu_shop_daily_key_sql.py`**：千牛店铺日度关键数据SQL生成
-- **`bin/prepare_qianniu_shop_data_daily_registration_sql.py`**：千牛店铺每日登记SQL生成
+- **`bin/prepare_order_list_for_storage.py`**：飞猪订单列表数据预处理
+- **`bin/prepare_shop_daily_key_sql.py`**：千牛店铺日度关键数据SQL生成
+- **`bin/prepare_sycm_flow_sql.py`**：SYCM流量和关注店铺人数SQL生成
 
 ### 数据入库标准流程
 
@@ -468,8 +456,8 @@ chrome --user-data-dir=/home/kk/.config/google-chrome
 ```bash
 # 完整的数据处理Pipeline：Excel -> JSON -> SQL -> Database
 python3 bin/prepare_shop_kpi_excel_to_json.py ~/Downloads/报表.xlsx | \
-  python3 bin/prepare_fliggy_customer_service_data_daily_sql.py | \
-  sudo mysql feizhu
+  python3 bin/prepare_customer_service_data_daily_sql.py | \
+  sudo mysql Xiangwang
 ```
 
 #### 分步模式（调试用）
@@ -482,13 +470,13 @@ python3 bin/prepare_shop_kpi_excel_to_json.py ~/Downloads/报表.xlsx > temp.jso
 cat temp.json | jq .summary
 
 # 步骤3: JSON转SQL
-cat temp.json | python3 bin/prepare_fliggy_customer_service_data_daily_sql.py > temp.sql
+cat temp.json | python3 bin/prepare_customer_service_data_daily_sql.py > temp.sql
 
 # 步骤4: 检查SQL
 cat temp.sql
 
 # 步骤5: 执行SQL
-sudo mysql feizhu < temp.sql
+sudo mysql Xiangwang < temp.sql
 ```
 
 ### 数据验证
@@ -497,34 +485,34 @@ sudo mysql feizhu < temp.sql
 
 ```bash
 # 验证赤兔KPI数据
-sudo mysql feizhu -e "
+sudo mysql Xiangwang -e "
   SELECT 
     '人均日接入' as 报表类型, 
     COUNT(*) as 记录数, 
     MAX(日期) as 最新日期 
-  FROM fliggy_customer_service_data_daily
+  FROM customer_service_data_daily
   UNION ALL
   SELECT 
     '每周店铺个人数据', 
     COUNT(*), 
     MAX(date_time) 
-  FROM fliggy_customer_service_performance_summary
+  FROM customer_service_performance_summary
   UNION ALL
   SELECT 
     '客服数据23年新', 
     COUNT(*), 
     MAX(date_time) 
-  FROM fliggy_customer_service_performance_workload_analysis;
+  FROM customer_service_performance_workload_analysis;
 "
 
 # 验证飞猪订单数据
-sudo mysql feizhu -e "
+sudo mysql Xiangwang -e "
   SELECT 
     COUNT(*) as 订单数, 
     COUNT(DISTINCT DATE(order_time)) as 覆盖天数,
     MIN(order_time) as 最早订单,
     MAX(order_time) as 最新订单
-  FROM fliggy_order_list;
+  FROM order_list;
 "
 ```
 
@@ -541,7 +529,7 @@ sudo mysql feizhu -e "
    - 检查 `summary.report_name` 字段是否正确
 
 3. **SQL执行失败**
-   - 检查表是否存在：`sudo mysql feizhu -e "SHOW TABLES;"`
+   - 检查表是否存在：`sudo mysql Xiangwang -e "SHOW TABLES;"`
    - 检查字段是否匹配：查看 `sql/` 目录下的建表SQL
 
 4. **字符编码问题**
@@ -552,16 +540,16 @@ sudo mysql feizhu -e "
 
 | 数据源 | 采集方式 | Excel转JSON | JSON转SQL | 目标数据库 | 目标表 |
 |--------|----------|-------------|-----------|------------|--------|
-| **赤兔KPI - 人均日接入** | CDP自动导出 | `prepare_shop_kpi_excel_to_json.py` | `prepare_fliggy_customer_service_data_daily_sql.py` | feizhu | fliggy_customer_service_data_daily |
-| **赤兔KPI - 每周店铺个人数据** | CDP自动导出 | `prepare_shop_kpi_excel_to_json.py` | `prepare_fliggy_customer_service_summary_sql.py` | feizhu | fliggy_customer_service_performance_summary |
-| **赤兔KPI - 客服数据23年新** | CDP自动导出 | `prepare_shop_kpi_excel_to_json.py` | `prepare_fliggy_customer_service_workload_sql.py` | feizhu | fliggy_customer_service_performance_workload_analysis |
-| **飞猪订单列表** | HTTP自动采集 | N/A | `prepare_fliggy_order_list_for_storage.py` + `prepare_fliggy_order_list_sql.py` | feizhu | fliggy_order_list |
-| **飞猪订单汇总** | HTTP自动采集 | N/A | `prepare_fliggy_order_list_for_storage.py` + `prepare_qianniu_shop_daily_key_sql.py` | qianniu | qianniu_fliggy_shop_daily_key_data |
-| **生意参谋首页** | HTTP自动采集 | N/A | 自动入库 | qianniu | sycm_homepage_metrics |
-| **生意参谋流量** | HTTP自动采集 | N/A | `prepare_sycm_flow_sql.py` | qianniu | qianniu_fliggy_shop_daily_key_data |
-| **飞猪商家工作台** | HTTP自动采集 | N/A | 自动入库 | feizhu | 多个业务模块表 |
-| **飞猪客服KPI** | API自动采集 | N/A | 自动入库 | feizhu | fliggy_employee_kpi |
-| **千牛店铺每日登记** | 手动导入/流量链路更新关注人数 | 自定义 | `prepare_qianniu_shop_data_daily_registration_sql.py` / `prepare_sycm_flow_sql.py` | qianniu | qianniu_shop_data_daily_registration |
+| **赤兔KPI - 人均日接入** | CDP自动导出 | `prepare_shop_kpi_excel_to_json.py` | `prepare_customer_service_data_daily_sql.py` | Xiangwang | customer_service_data_daily |
+| **赤兔KPI - 每周店铺个人数据** | CDP自动导出 | `prepare_shop_kpi_excel_to_json.py` | `prepare_customer_service_performance_summary_sql.py` | Xiangwang | customer_service_performance_summary |
+| **赤兔KPI - 客服数据23年新** | CDP自动导出 | `prepare_shop_kpi_excel_to_json.py` | `prepare_customer_service_performance_workload_sql.py` | Xiangwang | customer_service_performance_workload_analysis |
+| **飞猪订单列表** | HTTP自动采集 | N/A | `prepare_order_list_for_storage.py` + `prepare_order_list_sql.py` | Xiangwang | order_list |
+| **飞猪订单汇总** | HTTP自动采集 | N/A | `prepare_order_list_for_storage.py` + `prepare_shop_daily_key_sql.py` | Xiangwang | shop_daily_key_data |
+| **生意参谋首页** | HTTP自动采集 | N/A | 自动入库 | Xiangwang | homepage_metrics |
+| **生意参谋流量** | HTTP自动采集 | N/A | `prepare_sycm_flow_sql.py` | Xiangwang | shop_daily_key_data |
+| **飞猪商家工作台** | HTTP自动采集 | N/A | 自动入库 | Xiangwang | 多个业务模块表 |
+| **飞猪客服KPI** | API自动采集 | N/A | 自动入库 | Xiangwang | employee_kpi_metrics |
+| **店铺每日登记** | 流量链路更新关注人数 | 自定义 | `prepare_sycm_flow_sql.py` | Xiangwang | shop_data_daily_registration |
 
 ## 一键批量采集脚本示例
 
@@ -592,9 +580,9 @@ python3 -m tourism_automation.cli.main fliggy-order-list list \
   --deal-start "${DATE} 00:00:00" \
   --deal-end "${DATE} 23:59:59" > result/orders_raw_${DATE}.json
 
-python3 bin/prepare_fliggy_order_list_for_storage.py < result/orders_raw_${DATE}.json > result/orders_${DATE}.json
-python3 bin/prepare_fliggy_order_list_sql.py < result/orders_${DATE}.json | mysql feizhu
-python3 bin/prepare_qianniu_shop_daily_key_sql.py < result/orders_${DATE}.json | mysql qianniu
+python3 bin/prepare_order_list_for_storage.py < result/orders_raw_${DATE}.json > result/orders_${DATE}.json
+python3 bin/prepare_order_list_sql.py < result/orders_${DATE}.json | mysql Xiangwang
+python3 bin/prepare_shop_daily_key_sql.py < result/orders_${DATE}.json | mysql Xiangwang
 
 # 6. 赤兔KPI三个报表（需要手动导出和入库）
 echo "请手动导出赤兔KPI三个报表，然后运行："

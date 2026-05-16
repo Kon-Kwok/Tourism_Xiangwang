@@ -1,26 +1,29 @@
 # Skills - 快速执行脚本
 
-三大核心业务的快速执行脚本。
+四大核心业务的快速执行脚本。
 
 ## 📋 脚本列表
 
 | 脚本 | 业务 | 用途 |
 |------|------|------|
 | `kpi_reports.sh` | 赤兔KPI三个报表 | 采集、转换、入库客服数据 |
-| `fliggy_orders.sh` | 飞猪订单列表 | 采集、转换、入库订单明细，并同步 `gmv`、`total_bookings`、`total_pax` 到千牛日度关键表 |
+| `fliggy_orders.sh` | 飞猪订单列表 | 采集、转换、入库订单明细，并同步 `gmv`、`total_bookings`、`total_pax` 到店铺日度关键表 |
 | `sycm_flow.sh` | SYCM流量看板 | 采集、转换、入库流量数据和关注店铺人数 |
-| `all.sh` | 全部业务 | 一键执行所有三个业务 |
+| `alimama_daily.sh` | 阿里妈妈投放日报 | 采集、计算、入库明星店铺/直通车/引力魔方/万相台/万相台2 |
+| `all.sh` | 全部业务 | 一键执行所有四个业务 |
 
 ## 🚀 使用方法
 
-### 1. 配置环境变量（首次使用）
+### 1. 配置数据库连接（首次使用）
 
 ```bash
-# 设置数据库连接信息
-export HOST="your_mysql_host"
-export PORT="your_mysql_port"
-export USER="your_mysql_user"
-export PASS="your_mysql_password"
+# 推荐：项目根目录 .env 会被 scripts/lib/common.sh 自动加载
+cat > .env << EOF
+HOST=localhost
+PORT=3306
+USER=remote_user
+PASS=your_mysql_password
+EOF
 
 # 或者一次性设置
 export MYSQL_CMD="mysql -h $HOST -P $PORT -u $USER -p$PASS"
@@ -29,30 +32,33 @@ export MYSQL_CMD="mysql -h $HOST -P $PORT -u $USER -p$PASS"
 ### 2. 给脚本添加执行权限
 
 ```bash
-chmod +x skills/*.sh
+chmod +x scripts/*.sh
 ```
 
 ### 3. 执行单个业务
 
 ```bash
 # 赤兔KPI三个报表
-./skills/kpi_reports.sh 2026-04-24
+./scripts/kpi_reports.sh 2026-04-24
 
 # 飞猪订单列表
-./skills/fliggy_orders.sh 2026-04-24
+./scripts/fliggy_orders.sh 2026-04-24
 
 # SYCM流量看板
-./skills/sycm_flow.sh 2026-04-24
+./scripts/sycm_flow.sh 2026-04-24
+
+# 阿里妈妈投放日报
+./scripts/alimama_daily.sh 2026-04-24
 ```
 
 ### 4. 一键执行所有业务
 
 ```bash
 # 采集昨日数据
-./skills/all.sh $(date -d "yesterday" +%Y-%m-%d)
+./scripts/all.sh
 
 # 采集指定日期
-./skills/all.sh 2026-04-24
+./scripts/all.sh 2026-04-24
 ```
 
 ## ⚡ 性能优化建议
@@ -77,29 +83,33 @@ chmod +x skills/*.sh
 
 ```bash
 # 验证赤兔KPI数据
-mysql -h $HOST -P $PORT -u $USER -p$PASS feizhu << EOF
-SELECT '报表1' as 类型, COUNT(*) FROM fliggy_customer_service_data_daily WHERE 日期 = '2026-04-24'
+mysql -h $HOST -P $PORT -u $USER -p$PASS Xiangwang << EOF
+SELECT '报表1' as 类型, COUNT(*) FROM customer_service_data_daily WHERE 日期 = '2026-04-24'
 UNION ALL
-SELECT '报表2', COUNT(*) FROM fliggy_customer_service_performance_summary WHERE date_time = '2026-04-24'
+SELECT '报表2', COUNT(*) FROM customer_service_performance_summary WHERE date_time = '2026-04-24'
 UNION ALL
-SELECT '报表3', COUNT(*) FROM fliggy_customer_service_performance_workload_analysis WHERE date_time = '2026-04-24';
+SELECT '报表3', COUNT(*) FROM customer_service_performance_workload_analysis WHERE date_time = '2026-04-24';
 EOF
 
 # 验证飞猪订单数据
-mysql -h $HOST -P $PORT -u $USER -p$PASS feizhu \
-  -e "SELECT COUNT(*) as 订单数 FROM fliggy_order_list WHERE order_date = '2026-04-24';"
+mysql -h $HOST -P $PORT -u $USER -p$PASS Xiangwang \
+  -e "SELECT COUNT(*) as 订单数 FROM order_list WHERE order_date = '2026-04-24';"
 
 # 验证飞猪订单汇总数据
-mysql -h $HOST -P $PORT -u $USER -p$PASS qianniu \
-  -e "SELECT 日期, total_bookings, total_pax, gmv FROM qianniu_fliggy_shop_daily_key_data WHERE 日期 = '2026-04-24';"
+mysql -h $HOST -P $PORT -u $USER -p$PASS Xiangwang \
+  -e "SELECT 日期, total_bookings, total_pax, gmv FROM shop_daily_key_data WHERE 日期 = '2026-04-24';"
 
 # 验证SYCM流量数据
-mysql -h $HOST -P $PORT -u $USER -p$PASS qianniu \
-  -e "SELECT 日期, total_uv as 访客数, total_pv as 浏览量 FROM qianniu_fliggy_shop_daily_key_data WHERE 日期 = '2026-04-24';"
+mysql -h $HOST -P $PORT -u $USER -p$PASS Xiangwang \
+  -e "SELECT 日期, total_uv as 访客数, total_pv as 浏览量 FROM shop_daily_key_data WHERE 日期 = '2026-04-24';"
 
 # 验证关注店铺人数
-mysql -h $HOST -P $PORT -u $USER -p$PASS qianniu \
-  -e "SELECT 日期, 关注店铺人数 FROM qianniu_shop_data_daily_registration WHERE 日期 = '2026-04-24';"
+mysql -h $HOST -P $PORT -u $USER -p$PASS Xiangwang \
+  -e "SELECT 日期, 关注店铺人数 FROM shop_data_daily_registration WHERE 日期 = '2026-04-24';"
+
+# 验证阿里妈妈投放日报
+mysql -h $HOST -P $PORT -u $USER -p$PASS Xiangwang \
+  -e "SELECT COUNT(*) as 万相台2行数 FROM wanxiangtai_2 WHERE date_time = '2026-04-24';"
 ```
 
 ## 📊 性能记录

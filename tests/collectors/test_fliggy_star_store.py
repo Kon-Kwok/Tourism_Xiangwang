@@ -1,8 +1,10 @@
 import unittest
+from decimal import Decimal
 from unittest import mock
 
 from tourism_automation.collectors.fliggy_star_store.client import FliggyStarStoreClient
 from tourism_automation.collectors.fliggy_star_store.normalize import normalize_star_store_payload
+from tourism_automation.collectors.fliggy_star_store.storage import FliggyStarStoreStorage
 
 
 class FliggyStarStoreClientTests(unittest.TestCase):
@@ -100,3 +102,47 @@ class FliggyStarStoreNormalizeTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "no_data")
         self.assertIsNone(result["metrics"])
+
+
+class FliggyStarStoreStorageTests(unittest.TestCase):
+    @mock.patch.object(FliggyStarStoreStorage, "_connect")
+    def test_save_formats_money_and_percentage_fields_as_text(self, mock_connect):
+        mock_conn = mock.MagicMock()
+        mock_cursor = mock.MagicMock()
+        mock_connect.return_value.__enter__.return_value = mock_conn
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+
+        storage = FliggyStarStoreStorage(config={})
+        result = {
+            "status": "success",
+            "metrics": {
+                "date_time": "2026-05-08",
+                "cost": Decimal("12.34"),
+                "imp": 1000,
+                "click": 50,
+                "order_count": 2,
+                "sales": Decimal("200.00"),
+                "shopping_cart": 3,
+                "bookmark_product": 2,
+                "bookmark_store": 1,
+                "ctr": Decimal("0.05"),
+                "cpc": Decimal("0.25"),
+                "cpm": Decimal("12.34"),
+                "roi": Decimal("16.2000"),
+                "cvr": Decimal("0.04"),
+                "asp": Decimal("100.00"),
+                "cporder": Decimal("6.17"),
+                "cpshopping_cart": Decimal("4.11"),
+                "cart_rate": Decimal("0.06"),
+            },
+        }
+
+        storage.save(result)
+
+        insert_call = next(call for call in mock_cursor.execute.call_args_list if "INSERT INTO star_store" in call.args[0])
+        params = insert_call.args[1]
+        self.assertIn("￥12.34", params)
+        self.assertIn("￥200.00", params)
+        self.assertIn("￥0.25", params)
+        self.assertIn("5.00%", params)
+        self.assertIn("6.00%", params)

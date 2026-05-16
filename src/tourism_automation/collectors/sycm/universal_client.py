@@ -188,9 +188,9 @@ class UniversalSycmClient:
         }
 
 
-# 向后兼容：保留原有的SycmHomeClient接口
+# 首页专用客户端接口
 class SycmHomeClient:
-    """首页专用客户端（向后兼容）"""
+    """首页专用客户端"""
 
     def __init__(self, http: ChromeHttpClient | None = None):
         self.universal_client = UniversalSycmClient(http)

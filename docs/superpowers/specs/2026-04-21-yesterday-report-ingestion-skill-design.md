@@ -15,12 +15,12 @@
 
 昨日同一业务日期的 6 条链路：
 
-1. 飞猪订单汇总 -> `qianniu_fliggy_shop_daily_key_data`（`--all-pages` 采集后，经 `prepare_fliggy_order_list_for_storage.py` 计算，再由 `prepare_qianniu_shop_daily_key_sql.py` 写入）
-2. SYCM 流量 -> `qianniu_fliggy_shop_daily_key_data`
-3. SYCM 关注店铺人数 -> `qianniu_shop_data_daily_registration`
-4. `人均日接入` -> `fliggy_customer_service_data_daily`
-5. `客服数据23年新` -> `fliggy_customer_service_performance_workload_analysis`
-6. `每周店铺个人数据` -> `fliggy_customer_service_performance_summary`
+1. 飞猪订单汇总 -> `Xiangwang.shop_daily_key_data`（`--all-pages` 采集后，经 `prepare_order_list_for_storage.py` 计算，再由 `prepare_shop_daily_key_sql.py` 写入）
+2. SYCM 流量 -> `Xiangwang.shop_daily_key_data`
+3. SYCM 关注店铺人数 -> `Xiangwang.shop_data_daily_registration`
+4. `人均日接入` -> `Xiangwang.customer_service_data_daily`
+5. `客服数据23年新` -> `Xiangwang.customer_service_performance_workload_analysis`
+6. `每周店铺个人数据` -> `Xiangwang.customer_service_performance_summary`
 
 ## 成功标准
 

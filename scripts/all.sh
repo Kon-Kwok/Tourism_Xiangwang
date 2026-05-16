@@ -1,7 +1,7 @@
 #!/bin/bash
 # 四大核心业务一键采集脚本
 # 用途：一次性采集所有四个业务的数据
-# 使用：./scripts/all.sh YYYY-MM-DD
+# 使用：./scripts/all.sh [YYYY-MM-DD]
 
 set -e  # 遇到错误立即退出
 
@@ -10,8 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/common.sh"
 
 # 参数检查
-check_date_argument "$1"
-DATE=$1
+DATE="$(resolve_date_argument "$1")"
 
 # 打印欢迎信息
 echo -e "${GREEN}"

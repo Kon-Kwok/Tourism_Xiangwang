@@ -28,7 +28,7 @@ class PrepareSycmFlowSqlTests(unittest.TestCase):
 
         sql = MODULE.build_upsert_sql(payload)
 
-        self.assertIn("UPDATE shop_daily_key_data", sql)
+        self.assertIn("UPDATE Xiangwang.shop_daily_key_data", sql)
         self.assertIn("total_uv = 17884", sql)
         self.assertIn("total_pv = 35984", sql)
         self.assertIn("流量来源广告_uv = 13209", sql)

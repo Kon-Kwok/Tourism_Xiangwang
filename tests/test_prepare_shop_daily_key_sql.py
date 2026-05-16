@@ -6,14 +6,14 @@ from pathlib import Path
 from unittest import mock
 
 
-MODULE_PATH = Path(__file__).resolve().parent.parent / "bin" / "prepare_qianniu_shop_daily_key_sql.py"
-SPEC = importlib.util.spec_from_file_location("prepare_qianniu_shop_daily_key_sql", MODULE_PATH)
+MODULE_PATH = Path(__file__).resolve().parent.parent / "bin" / "prepare_shop_daily_key_sql.py"
+SPEC = importlib.util.spec_from_file_location("prepare_shop_daily_key_sql", MODULE_PATH)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
 SPEC.loader.exec_module(MODULE)
 
 
-class PrepareQianniuShopDailyKeySqlTests(unittest.TestCase):
+class PrepareShopDailyKeySqlTests(unittest.TestCase):
     def test_build_upsert_sql_maps_summary_fields(self):
         payload = {
             "summary": {

@@ -1,7 +1,7 @@
 #!/bin/bash
 # SYCM流量看板采集脚本
 # 用途：采集、转换、入库SYCM流量数据
-# 使用：./scripts/sycm_flow.sh YYYY-MM-DD
+# 使用：./scripts/sycm_flow.sh [YYYY-MM-DD]
 
 set -e  # 遇到错误立即退出
 
@@ -10,8 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/common.sh"
 
 # 参数检查
-check_date_argument "$1"
-DATE=$1
+DATE="$(resolve_date_argument "$1")"
 
 # 店铺名称（可由环境变量覆盖）
 SHOP_NAME="${SHOP_NAME:-皇家加勒比国际游轮旗舰店}"
