@@ -23,7 +23,6 @@ DEFAULT_TABLES = (
     ("gravity_rubiks_cube", "date_time", "阿里妈妈-引力魔方"),
     ("wanxiangtai", "date_time", "阿里妈妈-万相台"),
     ("wanxiangtai_2", "date_time", "阿里妈妈-万相台2"),
-    ("order_list", "order_date", "飞猪订单明细"),
 )
 TABLE_DISPLAY_NAMES = {table_name: display_name for table_name, _, display_name in DEFAULT_TABLES}
 DATE_COLUMN_CANDIDATES = ("日期", "date_time", "order_date", "biz_date", "collection_date")
