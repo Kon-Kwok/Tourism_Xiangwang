@@ -39,7 +39,7 @@ echo -e "  ${GREEN}✓ 阿里妈妈投放数据写入完成${NC}"
 echo -e "${YELLOW}▶ [2/8] KPI询单人数汇总 → chat_volume${NC}"
 ${MYSQL_EXEC} 2>/dev/null <<SQL
 UPDATE shop_daily_key_data sd,
-       (SELECT SUM(CAST(询单人数 AS UNSIGNED)) AS total FROM customer_service_performance_summary WHERE date_time='${DATE}') src
+       (SELECT SUM(IF(询单人数 REGEXP '^[0-9]+$', 询单人数, 0)) AS total FROM customer_service_performance_summary WHERE date_time='${DATE}') src
 SET sd.chat_volume = src.total WHERE sd.日期='${DATE}';
 SQL
 echo -e "  ${GREEN}✓ chat_volume 写入完成${NC}"
