@@ -22,6 +22,12 @@ python3 skills/skills/openclaw-daily-database-excel/scripts/export_daily_databas
 
 # 指定输出文件
 python3 skills/skills/openclaw-daily-database-excel/scripts/export_daily_database_excel.py --date 2026-05-16 --output exports/xiangwang_2026-05-16.xlsx
+
+# 日期范围合并导出
+python3 skills/skills/openclaw-daily-database-excel/scripts/export_daily_database_excel.py --start 2026-05-01 --end 2026-05-17
+
+# 日期范围 + 指定输出文件
+python3 skills/skills/openclaw-daily-database-excel/scripts/export_daily_database_excel.py --start 2026-05-01 --end 2026-05-17 --output exports/merged.xlsx
 ```
 
 ## 默认输出
@@ -87,8 +93,9 @@ python3 skills/skills/openclaw-daily-database-excel/scripts/export_daily_databas
 
 ## 使用规则
 
-- 用户说“当日”“今天”时，不传日期，脚本默认今天。
-- 用户给出日期时，使用 `--date YYYY-MM-DD`。
+- 用户说”当日””今天”时，不传日期，脚本默认今天。
+- 用户给出单个日期时，使用 `--date YYYY-MM-DD`。
+- 用户给出日期范围”xx到xx”时，使用 `--start YYYY-MM-DD --end YYYY-MM-DD`。
 - 导出前不自动采集数据；当日表为空时默认不导出该表。
 - 用户要求“只导出入库过的表”“不要空表”时，保持默认行为，不加 `--include-empty-tables`。
 - 需要先采集日报时，先使用 `openclaw-daily-data-collection` 技能运行采集，再运行本技能导出 Excel。

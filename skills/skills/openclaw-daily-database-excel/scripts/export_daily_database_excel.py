@@ -101,10 +101,7 @@ def all_date_tables(cursor, database: str) -> list[tuple[str, str, str]]:
     return tables
 
 
-def fetch_table(cursor, database: str, table_name: str, date_column: str, biz_date: str):
-    cursor.execute(f"SELECT * FROM `{database}`.`{table_name}` WHERE `{date_column}` = %s", (biz_date,))
-    columns = [column[0] for column in cursor.description]
-    rows = cursor.fetchall()
+def _clean_columns_rows(columns, rows, date_column):
     keep_idx = [i for i, col in enumerate(columns) if col not in EXCLUDE_COLUMNS]
     columns = [columns[i] for i in keep_idx]
     rows = [tuple(row[i] for i in keep_idx) for row in rows]
@@ -121,6 +118,23 @@ def fetch_table(cursor, database: str, table_name: str, date_column: str, biz_da
     columns = [columns[i] for i in new_order]
     rows = [tuple(row[i] for i in new_order) for row in rows]
     return columns, rows
+
+
+def fetch_table(cursor, database: str, table_name: str, date_column: str, biz_date: str):
+    cursor.execute(f"SELECT * FROM `{database}`.`{table_name}` WHERE `{date_column}` = %s", (biz_date,))
+    columns = [column[0] for column in cursor.description]
+    rows = cursor.fetchall()
+    return _clean_columns_rows(columns, rows, date_column)
+
+
+def fetch_table_range(cursor, database: str, table_name: str, date_column: str, start_date: str, end_date: str):
+    cursor.execute(
+        f"SELECT * FROM `{database}`.`{table_name}` WHERE `{date_column}` BETWEEN %s AND %s ORDER BY `{date_column}`, `id`",
+        (start_date, end_date),
+    )
+    columns = [column[0] for column in cursor.description]
+    rows = cursor.fetchall()
+    return _clean_columns_rows(columns, rows, date_column)
 
 
 def safe_sheet_name(name: str, used: set[str]) -> str:
@@ -157,24 +171,31 @@ def autosize_workbook(workbook) -> None:
             worksheet.column_dimensions[column_letter].width = min(max(max_length + 2, 10), 40)
 
 
-def build_workbook(conn, args, biz_date: str):
+def build_workbook(conn, args, biz_date: str, start_date: str = None, end_date: str = None):
     workbook = openpyxl.Workbook()
     workbook.remove(workbook.active)
     used_sheet_names: set[str] = set()
     summary = []
+    range_mode = start_date is not None and end_date is not None
 
     with conn.cursor() as cursor:
         tables = all_date_tables(cursor, args.database) if args.all_date_tables else existing_default_tables(cursor, args.database)
 
         for table_name, date_column, display_name in tables:
-            columns, rows = fetch_table(cursor, args.database, table_name, date_column, biz_date)
+            if range_mode:
+                columns, rows = fetch_table_range(cursor, args.database, table_name, date_column, start_date, end_date)
+            else:
+                columns, rows = fetch_table(cursor, args.database, table_name, date_column, biz_date)
             if not rows and not args.include_empty_tables:
                 continue
             row_count = write_sheet(workbook, display_name, columns, rows, used_sheet_names)
             summary.append((display_name, date_column, row_count))
 
     overview = workbook.create_sheet("汇总", 0)
-    overview.append(["日期", biz_date])
+    if range_mode:
+        overview.append(["日期范围", f"{start_date} 至 {end_date}", "", ""])
+    else:
+        overview.append(["日期", biz_date])
     overview.append([])
     overview.append(["表名", "日期字段", "行数"])
     for row in summary:
@@ -188,6 +209,8 @@ def main() -> int:
     load_env()
     parser = argparse.ArgumentParser(description="Export Xiangwang daily database rows to Excel")
     parser.add_argument("--date", help="Business date, format YYYY-MM-DD. Defaults to today.")
+    parser.add_argument("--start", help="Start date for range export, format YYYY-MM-DD.")
+    parser.add_argument("--end", help="End date for range export, format YYYY-MM-DD.")
     parser.add_argument("--output", help="Output xlsx path. Defaults to exports/daily_database_YYYY-MM-DD.xlsx")
     parser.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", "3306")))
@@ -198,8 +221,24 @@ def main() -> int:
     parser.add_argument("--include-empty-tables", action="store_true", help="Also create sheets for tables with no rows on the selected date.")
     args = parser.parse_args()
 
-    biz_date = parse_date(args.date)
-    output_path = Path(args.output) if args.output else PROJECT_ROOT / "exports" / f"daily_database_{biz_date}.xlsx"
+    range_mode = args.start is not None and args.end is not None
+    if (args.start is not None) != (args.end is not None):
+        parser.error("--start and --end must be used together")
+
+    if range_mode:
+        start_date = parse_date(args.start)
+        end_date = parse_date(args.end)
+        biz_date = None
+    else:
+        biz_date = parse_date(args.date)
+        start_date = end_date = None
+
+    if args.output:
+        output_path = Path(args.output)
+    elif range_mode:
+        output_path = PROJECT_ROOT / "exports" / f"daily_database_{start_date}_{end_date}.xlsx"
+    else:
+        output_path = PROJECT_ROOT / "exports" / f"daily_database_{biz_date}.xlsx"
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -210,7 +249,7 @@ def main() -> int:
         args.host = "127.0.0.1"
         conn = connect(args)
     try:
-        workbook, summary = build_workbook(conn, args, biz_date)
+        workbook, summary = build_workbook(conn, args, biz_date=biz_date, start_date=start_date, end_date=end_date)
         workbook.save(output_path)
     finally:
         conn.close()
