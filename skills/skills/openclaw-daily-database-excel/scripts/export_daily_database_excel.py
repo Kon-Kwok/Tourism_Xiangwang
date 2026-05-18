@@ -109,6 +109,18 @@ def fetch_table(cursor, database: str, table_name: str, date_column: str, biz_da
     keep_idx = [i for i, col in enumerate(columns) if col not in EXCLUDE_COLUMNS]
     columns = [columns[i] for i in keep_idx]
     rows = [tuple(row[i] for i in keep_idx) for row in rows]
+    new_order = []
+    for head in ("id", date_column):
+        try:
+            idx = columns.index(head)
+            new_order.append(idx)
+        except ValueError:
+            pass
+    for i in range(len(columns)):
+        if i not in new_order:
+            new_order.append(i)
+    columns = [columns[i] for i in new_order]
+    rows = [tuple(row[i] for i in new_order) for row in rows]
     return columns, rows
 
 
