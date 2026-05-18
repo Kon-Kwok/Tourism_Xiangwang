@@ -23,9 +23,11 @@ DEFAULT_TABLES = (
     ("gravity_rubiks_cube", "date_time", "阿里妈妈-引力魔方"),
     ("wanxiangtai", "date_time", "阿里妈妈-万相台"),
     ("wanxiangtai_2", "date_time", "阿里妈妈-万相台2"),
+    ("order_list", "order_date", "飞猪订单明细"),
 )
 TABLE_DISPLAY_NAMES = {table_name: display_name for table_name, _, display_name in DEFAULT_TABLES}
 DATE_COLUMN_CANDIDATES = ("日期", "date_time", "order_date", "biz_date", "collection_date")
+EXCLUDE_COLUMNS = {"created_at", "updated_at"}
 
 
 def load_env() -> None:
@@ -104,6 +106,9 @@ def fetch_table(cursor, database: str, table_name: str, date_column: str, biz_da
     cursor.execute(f"SELECT * FROM `{database}`.`{table_name}` WHERE `{date_column}` = %s", (biz_date,))
     columns = [column[0] for column in cursor.description]
     rows = cursor.fetchall()
+    keep_idx = [i for i, col in enumerate(columns) if col not in EXCLUDE_COLUMNS]
+    columns = [columns[i] for i in keep_idx]
+    rows = [tuple(row[i] for i in keep_idx) for row in rows]
     return columns, rows
 
 
