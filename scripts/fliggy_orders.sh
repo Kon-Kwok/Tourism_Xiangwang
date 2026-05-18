@@ -18,7 +18,7 @@ MYSQL="$(init_mysql)"
 # 打印开始标题
 print_collection_start "飞猪订单列表采集" "$DATE"
 
-# 步骤1: 采集订单数据（带 all-pages，供后续总量计算）
+# 步骤1: 采集订单数据
 print_step 1 4 "采集订单数据"
 python3 -m tourism_automation.cli.main fliggy-order-list list \
   --page-num 1 \
@@ -48,7 +48,7 @@ cat /tmp/orders_prep_$$.json | \
   $MYSQL Xiangwang
 print_success "订单明细入库完成"
 
-# 步骤4: 订单汇总入库（total_bookings / total_pax / gmv）到店铺日度关键表
+# 步骤4: 订单汇总入库
 print_step 4 4 "订单汇总入库"
 cat /tmp/orders_prep_$$.json | \
   python3 bin/prepare_shop_daily_key_sql.py | \

@@ -40,7 +40,7 @@ def build_upsert_sql(payload):
 
     values = []
     for row in rows:
-        # 提取金额（去除￥符号）
+        # 提取金额
         actual_fee = _format_decimal(row.get("actual_fee"))
 
         values.append(
@@ -88,7 +88,7 @@ DELETE FROM {TARGET_TABLE} WHERE order_date = '{biz_date}';
 -- 订单数: {summary.get('order_count')}
 -- GMV: {summary.get('gmv')}
 
--- 创建表（如果不存在）
+-- 创建表
 CREATE TABLE IF NOT EXISTS {TARGET_TABLE} (
     order_id VARCHAR(50) PRIMARY KEY,
     item_title VARCHAR(300),

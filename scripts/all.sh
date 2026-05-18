@@ -43,7 +43,7 @@ echo -e "${BLUE}[$(date +%H:%M:%S)] 业务4：阿里妈妈投放日报${NC}"
 "$SCRIPT_DIR/alimama_daily.sh" "$DATE"
 echo ""
 
-# 业务5: 跨表规则应用（补齐衍生字段）
+# 业务5: 跨表规则应用
 echo -e "${BLUE}[$(date +%H:%M:%S)] 业务5：跨表规则应用${NC}"
 "$SCRIPT_DIR/apply_cross_table_rules.sh" "$DATE"
 echo ""

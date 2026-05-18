@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **核心特性**:
 - 复用本机 Chrome 登录态
-- 模块化容错设计（单模块失败不影响整体采集）
+- 模块化容错设计
 - 统一CLI命令入口
 - 按场景使用 HTTP + Cookie 或 CDP + fetch
 
@@ -68,7 +68,7 @@ src/tourism_automation/
 ### Chrome调试窗口管理
 
 ```bash
-# 启动Chrome调试窗口（首次或重启）
+# 启动Chrome调试窗口
 ./bin/start-chrome-unified.sh
 
 # 检查Chrome调试窗口状态
@@ -83,7 +83,7 @@ curl -s http://localhost:9222/json | jq '.[] | {id, url, title}'
 # 查看Chrome日志
 tail -f /tmp/chrome_debug.log
 
-# ⚠️ 不要使用这些命令（会关闭Chrome）：
+# ⚠️ 不要使用这些命令：
 # pkill chrome  # 禁止！
 # pkill -9 chrome  # 禁止！
 ```
@@ -100,13 +100,13 @@ python3 -m tourism_automation.cli.main sycm collect-home --date 2026-04-19 --sho
 # 生意参谋 - 列出所有可用页面
 python3 -m tourism_automation.cli.main sycm list-pages
 
-# 生意参谋 - 采集指定页面数据（支持多页面采集）
+# 生意参谋 - 采集指定页面数据
 python3 -m tourism_automation.cli.main sycm collect-page --page-id flow_monitor --date-range "2026-04-19|2026-04-19"
 
 # 飞猪商家工作台 - 采集首页数据
 python3 -m tourism_automation.cli.main fliggy-home collect-home --date 2026-04-19 --shop-name "皇家加勒比国际游轮旗舰店"
 
-# 飞猪客服KPI - 采集员工KPI数据（需要Chrome调试窗口运行）
+# 飞猪客服KPI - 采集员工KPI数据
 python3 -m tourism_automation.cli.main fliggy-kpi employee --date 2026-04-19 --method api --shop-name "皇家加勒比国际游轮旗舰店"
 ```
 
@@ -158,7 +158,7 @@ sudo mysql Xiangwang -e "SELECT * FROM customer_service_performance_workload_ana
 
 系统支持从赤兔名品KPI系统下载3个报表，转换为JSON，然后入库：
 
-#### 1. 人均日接入报表（日数据）
+#### 1. 人均日接入报表
 
 ```bash
 # 步骤1: 使用CDP导出Excel
@@ -180,7 +180,7 @@ cat result/kpi1_人均日接入.json | \
 **对应表**: `Xiangwang.customer_service_data_daily`
 **数据脚本**: `bin/prepare_customer_service_data_daily_sql.py`
 
-#### 2. 每周店铺个人数据报表（日报采集按单日导出）
+#### 2. 每周店铺个人数据报表
 
 ```bash
 # 步骤1: 使用CDP导出Excel
@@ -202,7 +202,7 @@ cat result/kpi2_每周店铺个人数据.json | \
 **对应表**: `Xiangwang.customer_service_performance_summary`
 **数据脚本**: `bin/prepare_customer_service_performance_summary_sql.py`
 
-#### 3. 客服数据23年新报表（工作量分析，日报采集按单日导出）
+#### 3. 客服数据23年新报表
 
 ```bash
 # 步骤1: 使用CDP导出Excel
@@ -244,7 +244,7 @@ python3 -m tourism_automation.cli.main fliggy-order-list list \
   --deal-start "2026-04-24 00:00:00" \
   --deal-end "2026-04-24 23:59:59" > result/orders_raw.json
 
-# 步骤2: 数据预处理（计算 total_bookings、total_pax、gmv）
+# 步骤2: 数据预处理
 cat result/orders_raw.json | \
   python3 bin/prepare_order_list_for_storage.py > result/orders_prepared.json
 
@@ -306,7 +306,7 @@ cat orders_prepared.json | \
 **重要说明**：
 - 该表按日期汇总多来源数据
 - 当前脚本使用 `UPDATE` 后接 `INSERT ... WHERE NOT EXISTS`，适配 `日期` 不是唯一键的线上表
-- 如果后续改成 `ON DUPLICATE KEY UPDATE`，必须先确认 `日期` 字段具备唯一键（不只是普通索引）
+- 如果后续改成 `ON DUPLICATE KEY UPDATE`，必须先确认 `日期` 字段具备唯一键
 
 ## 数据库结构
 
@@ -315,10 +315,10 @@ cat orders_prepared.json | \
 - `collection_batches`: 生意参谋采集批次记录
 - `homepage_metrics`: 生意参谋首页核心指标
 - `homepage_trends`: 生意参谋首页趋势序列
-- `customer_service_data_daily`: 客服数据汇总-日数据（人均日接入）
+- `customer_service_data_daily`: 客服数据汇总-日数据
 - `customer_service_data_weekly`: 客服数据汇总-周数据
-- `customer_service_performance_summary`: 客服绩效-汇总（每周店铺个人数据）
-- `customer_service_performance_workload_analysis`: 客服绩效-工作量分析（客服数据23年新）
+- `customer_service_performance_summary`: 客服绩效-汇总
+- `customer_service_performance_workload_analysis`: 客服绩效-工作量分析
 - `order_list`: 飞猪订单列表
 - `shop_daily_key_data`: 店铺日度关键数据
 - `shop_data_daily_registration`: 店铺数据每日登记
@@ -354,8 +354,8 @@ cat orders_prepared.json | \
 - 启动脚本：`bin/start-chrome-unified.sh`
 
 **为什么不能关闭**：
-- Chrome调试窗口用于所有数据采集（SYCM、飞猪、KPI）
-- 关闭后需要重新登录所有网站（淘宝、Topchitu等）
+- Chrome调试窗口用于所有数据采集
+- 关闭后需要重新登录所有网站
 - 可能需要再次输入验证码
 - 破坏已建立的登录会话
 
@@ -367,15 +367,15 @@ cat orders_prepared.json | \
 
 **Chrome识别特征**：
 ```bash
-# 调试Chrome（禁止关闭）
+# 调试Chrome，禁止关闭
 chrome --remote-debugging-port=9222 --user-data-dir=/home/kk/.config/google-chrome-debug
 
-# 正常Chrome（可以关闭）
+# 正常Chrome，可以关闭
 chrome --user-data-dir=/home/kk/.config/google-chrome
 ```
 
 **禁止的操作**：
-- ❌ 不要运行 `pkill chrome`（会关闭所有Chrome）
+- ❌ 不要运行 `pkill chrome`
 - ❌ 不要关闭Chrome调试窗口
 - ❌ 不要删除 `~/.config/google-chrome-debug` 目录
 - ❌ 不要在Chrome中点击"退出登录"
@@ -383,7 +383,7 @@ chrome --user-data-dir=/home/kk/.config/google-chrome
 **Chrome会话管理技术细节**：
 - 使用 `secretstorage` 读取Chrome加密密钥
 - CDP脚本使用环境变量 `CDP_PORT_FILE` 定位调试端口
-- 仅读取Cookie，不使用CDP进行页面操作（除非必要）
+- 仅读取Cookie，不使用CDP进行页面操作
 
 ### 数据库Schema
 
@@ -399,20 +399,20 @@ chrome --user-data-dir=/home/kk/.config/google-chrome
 - `pymysql`: MySQL连接
 - `secretstorage`: Chrome密钥读取
 - `cryptography`: Cookie解密
-- `openpyxl`: Excel文件处理（赤兔KPI报表转换）
+- `openpyxl`: Excel文件处理
 
 ## 数据处理完整流程
 
 ### 数据获取方式分类
 
-1. **自动采集（API/HTTP）**：直接入库，无需手动处理
+1. **自动采集**：直接入库，无需手动处理
    - 生意参谋首页指标
    - 飞猪商家工作台首页数据
-   - 飞猪客服KPI（API方式）
+   - 飞猪客服KPI
    - 飞猪订单列表
 
-2. **半自动采集（CDP+Excel）**：需要导出Excel后转换入库
-   - 赤兔KPI三个报表（人均日接入、每周店铺个人数据、客服数据23年新）
+2. **半自动采集**：需要导出Excel后转换入库
+   - 赤兔KPI三个报表
 
 ### 核心脚本说明
 
@@ -421,7 +421,7 @@ chrome --user-data-dir=/home/kk/.config/google-chrome
 **`bin/prepare_shop_kpi_excel_to_json.py`**
 - 功能：将赤兔KPI导出的Excel文件转换为统一JSON格式
 - 输入：Excel文件路径
-- 输出：JSON格式（包含summary和rows）
+- 输出：JSON格式
 - 使用：`python3 bin/prepare_shop_kpi_excel_to_json.py <excel_file>`
 
 #### JSON转SQL脚本
@@ -451,7 +451,7 @@ chrome --user-data-dir=/home/kk/.config/google-chrome
 
 ### 数据入库标准流程
 
-#### PipeLine模式（推荐）
+#### PipeLine模式
 
 ```bash
 # 完整的数据处理Pipeline：Excel -> JSON -> SQL -> Database
@@ -460,7 +460,7 @@ python3 bin/prepare_shop_kpi_excel_to_json.py ~/Downloads/报表.xlsx | \
   sudo mysql Xiangwang
 ```
 
-#### 分步模式（调试用）
+#### 分步模式
 
 ```bash
 # 步骤1: Excel转JSON
@@ -562,19 +562,19 @@ SHOP="皇家加勒比国际游轮旗舰店"
 
 echo "开始采集 $DATE 的数据..."
 
-# 1. 生意参谋首页（自动入库）
+# 1. 生意参谋首页
 python3 -m tourism_automation.cli.main sycm collect-home --date $DATE --shop-name "$SHOP"
 
-# 2. 生意参谋流量（自动入库）
+# 2. 生意参谋流量
 python3 -m tourism_automation.cli.main sycm flow-monitor --date $DATE --shop-name "$SHOP"
 
-# 3. 飞猪商家工作台（自动入库）
+# 3. 飞猪商家工作台
 python3 -m tourism_automation.cli.main fliggy-home collect-home --date $DATE --shop-name "$SHOP"
 
-# 4. 飞猪客服KPI（自动入库）
+# 4. 飞猪客服KPI
 python3 -m tourism_automation.cli.main fliggy-kpi employee --date $DATE --method api --shop-name "$SHOP"
 
-# 5. 飞猪订单列表（订单明细 + 千牛订单汇总）
+# 5. 飞猪订单列表
 python3 -m tourism_automation.cli.main fliggy-order-list list \
   --page-num 1 --page-size 100 --all-pages \
   --deal-start "${DATE} 00:00:00" \
@@ -584,7 +584,7 @@ python3 bin/prepare_order_list_for_storage.py < result/orders_raw_${DATE}.json >
 python3 bin/prepare_order_list_sql.py < result/orders_${DATE}.json | mysql Xiangwang
 python3 bin/prepare_shop_daily_key_sql.py < result/orders_${DATE}.json | mysql Xiangwang
 
-# 6. 赤兔KPI三个报表（需要手动导出和入库）
+# 6. 赤兔KPI三个报表
 echo "请手动导出赤兔KPI三个报表，然后运行："
 echo "./bin/import_kpi_reports.sh"
 

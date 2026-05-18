@@ -1,5 +1,5 @@
 #!/bin/bash
-# 启动统一的调试Chrome（作为主浏览器使用）
+# 启动统一的调试Chrome
 
 set -e
 
@@ -27,7 +27,7 @@ stop_refresh_daemon() {
 
 start_refresh_daemon() {
     if [ "${CHROME_REFRESH_ENABLED:-1}" = "0" ]; then
-        echo "自动刷新已禁用（CHROME_REFRESH_ENABLED=0）"
+        echo "自动刷新已禁用"
         return
     fi
 
@@ -79,7 +79,7 @@ else
 fi
 
 echo "======================================"
-echo "启动统一Chrome（调试模式）"
+echo "启动统一Chrome"
 echo "======================================"
 echo ""
 
@@ -124,7 +124,7 @@ sleep 6
 # 等待Chrome启动并创建配置
 for i in {1..15}; do
     if curl -s http://localhost:$DEBUG_PORT/json/version > /dev/null 2>&1; then
-        # 创建DevToolsActivePort文件（CDP脚本需要）
+# 创建DevToolsActivePort文件
         mkdir -p "$CONFIG_DIR/Default"
         # 获取浏览器WebSocket URL
         BROWSER_WS=$(curl -s http://localhost:$DEBUG_PORT/json/version | jq -r '.webSocketDebuggerUrl' | sed 's|ws://[^:]*:[0-9]*/||')
@@ -145,7 +145,7 @@ for i in {1..15}; do
         echo "  - 已启用业务标签页自动刷新，默认每30分钟刷新一次"
         echo ""
         echo "现在可以："
-        echo "  1. 登录所有需要的网站（SYCM、飞猪、赤兔、阿里妈妈等）"
+        echo "  1. 登录所有需要的网站"
         echo "  2. 采集KPI数据"
         echo ""
         echo "采集数据命令："

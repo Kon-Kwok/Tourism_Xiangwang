@@ -12,7 +12,7 @@ source "${SCRIPT_DIR}/lib/common.sh"
 # 参数检查
 DATE="$(resolve_date_argument "$1")"
 
-# 店铺名称（可由环境变量覆盖）
+# 店铺名称，可由环境变量 SHOP_NAME 覆盖
 SHOP_NAME="${SHOP_NAME:-皇家加勒比国际游轮旗舰店}"
 
 # 初始化数据库连接
@@ -33,7 +33,7 @@ fi
 print_success "采集完成"
 
 # 步骤2: 数据转换
-print_step 2 3 "数据转换为SQL（含关注店铺人数）"
+print_step 2 3 "数据转换为SQL"
 cat /tmp/sycm_flow_$$.json | \
   python3 bin/prepare_sycm_flow_sql.py > /tmp/sycm_flow_$$.sql
 
