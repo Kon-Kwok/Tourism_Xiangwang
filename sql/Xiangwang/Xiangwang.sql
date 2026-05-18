@@ -169,6 +169,7 @@ CREATE TABLE `homepage_trends` (
 
 DROP TABLE IF EXISTS `order_list`;
 CREATE TABLE `order_list` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `order_id` varchar(50) NOT NULL,
   `item_title` varchar(300) DEFAULT NULL,
   `package_type` varchar(200) DEFAULT NULL,
@@ -179,7 +180,9 @@ CREATE TABLE `order_list` (
   `order_date` date DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`order_id`)
+  PRIMARY KEY (`id`),
+  KEY `idx_order_date` (`order_date`),
+  KEY `idx_order_id` (`order_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 DROP TABLE IF EXISTS `shop_daily_key_data`;
