@@ -160,6 +160,105 @@ def write_sheet(workbook, sheet_name: str, columns: Iterable[str], rows: Iterabl
     return count
 
 
+COLUMN_FORMAT_RULES: dict[str, dict[str, str]] = {
+    "赤兔-人均日接入": {
+        "回复率": "0.00%",
+        "询单最终付款成功率": "0.00%",
+        "评价发送率": "0.00%",
+        "客户满意比": "0.0000",
+        "很满意": "0",
+        "满意": "0",
+        "一般": "0",
+        "不满意": "0",
+        "很不满意": "0",
+    },
+    "赤兔-每周店铺个人数据": {
+        "询单人数": "0",
+    },
+    "赤兔-客服数据23年新": {
+        "未回复人数": "0.00%",
+        "旺旺回复率": "0.00%",
+    },
+    "店铺每日登记": {
+        "咨询转化率": "0.00%",
+        "下单转化率": "0.00%",
+    },
+}
+
+
+def _apply_cell_formats(workbook) -> None:
+    for worksheet in workbook.worksheets:
+        name = worksheet.title
+        rules = COLUMN_FORMAT_RULES.get(name)
+        if rules is None:
+            continue
+
+        header_row = worksheet[1]
+        col_indices: dict[str, int] = {}
+        for idx, cell in enumerate(header_row):
+            if cell.value in rules:
+                col_indices[cell.value] = idx
+
+        if not col_indices:
+            continue
+
+        for row in worksheet.iter_rows(min_row=2):
+            for col_name, col_idx in col_indices.items():
+                cell = row[col_idx]
+                fmt_code = rules[col_name]
+                value = cell.value
+
+                if value is None:
+                    continue
+
+                if isinstance(value, str):
+                    try:
+                        value = float(value)
+                    except (ValueError, TypeError):
+                        continue
+
+                cell.value = value
+                cell.number_format = fmt_code
+
+
+def _handle_delay_chat_volume(workbook, summary: list) -> None:
+    """替换最新日期的 chat_volume=0 为 '延迟统计'。"""
+    ws = None
+    for worksheet in workbook.worksheets:
+        if worksheet.title == "店铺日度关键数据":
+            ws = worksheet
+            break
+    if ws is None:
+        return
+
+    header_row = ws[1]
+    date_col_idx, chat_col_idx = None, None
+    for idx, cell in enumerate(header_row):
+        if cell.value == "日期":
+            date_col_idx = idx
+        elif cell.value == "chat_volume":
+            chat_col_idx = idx
+    if date_col_idx is None or chat_col_idx is None:
+        return
+
+    dates = set()
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        d = row[date_col_idx]
+        if isinstance(d, date):
+            dates.add(d)
+    max_date = max(dates) if dates else None
+
+    if max_date is None:
+        return
+
+    for row in ws.iter_rows(min_row=2):
+        date_cell = row[date_col_idx]
+        chat_cell = row[chat_col_idx]
+        if isinstance(date_cell.value, date) and date_cell.value == max_date and chat_cell.value == 0:
+            chat_cell.value = "延迟统计"
+            chat_cell.number_format = "@"
+
+
 def autosize_workbook(workbook) -> None:
     for worksheet in workbook.worksheets:
         for column_cells in worksheet.columns:
@@ -201,6 +300,8 @@ def build_workbook(conn, args, biz_date: str, start_date: str = None, end_date: 
     for row in summary:
         overview.append(list(row))
     overview.freeze_panes = "A4"
+    _apply_cell_formats(workbook)
+    _handle_delay_chat_volume(workbook, summary)
     autosize_workbook(workbook)
     return workbook, summary
 

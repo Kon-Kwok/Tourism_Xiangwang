@@ -79,10 +79,10 @@ echo -e "  ${GREEN}✓ 投放汇总字段计算完成${NC}"
 echo -e "${YELLOW}▶ [6/8] shop_daily_key_data → shop_data_daily_registration${NC}"
 ${MYSQL_EXEC} 2>/dev/null <<SQL
 UPDATE shop_data_daily_registration dr,
-       (SELECT total_pv, total_uv, gmv, 流量来源汇总, total_bookings
+       (SELECT total_pv, total_uv, gmv, 直引万品点击量, total_bookings
         FROM shop_daily_key_data WHERE 日期='${DATE}') src
 SET dr.PV=src.total_pv, dr.UV=src.total_uv, dr.GMV=src.gmv,
-    dr.PaidUV=src.流量来源汇总, dr.下单买家数=src.total_bookings
+    dr.PaidUV=src.直引万品点击量, dr.下单买家数=src.total_bookings
 WHERE dr.日期='${DATE}';
 SQL
 echo -e "  ${GREEN}✓ 5 个字段复制完成${NC}"

@@ -55,6 +55,25 @@ def _format_varchar(value) -> str:
     return _quote_string(str(value))
 
 
+def _format_avg_reception_seconds(raw_value) -> str:
+    """将 API 返回的秒数转换为 'X分Y秒' 格式。"""
+    decimal_value = _to_decimal(raw_value)
+    if decimal_value is None:
+        return "NULL"
+    total_sec = int(decimal_value.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    minutes = total_sec // 60
+    seconds = total_sec % 60
+    return _quote_string(f"{minutes}分{seconds}秒")
+
+
+def _format_avg_reception_int(raw_value) -> str:
+    """取平均接待时长的整数秒。"""
+    decimal_value = _to_decimal(raw_value)
+    if decimal_value is None:
+        return "NULL"
+    return str(int(decimal_value.quantize(Decimal("1"), rounding=ROUND_HALF_UP)))
+
+
 def _iter_customer_rows(payload: dict):
     for row in payload.get("rows", []):
         nickname = row.get("客服昵称")
@@ -93,7 +112,8 @@ def build_upsert_sql(payload: dict) -> str:
                     _format_int(row.get("长接待人数")),
                     _format_decimal(row.get("首次响应(秒)"), "0.00"),
                     _format_decimal(row.get("平均响应(秒)"), "0.00"),
-                    _format_varchar(row.get("平均接待时长")),
+                    _format_avg_reception_seconds(row.get("平均接待时长")),
+                    _format_avg_reception_int(row.get("平均接待时长")),
                     _format_varchar(biz_date),
                 ]
             )
@@ -110,7 +130,7 @@ def build_upsert_sql(payload: dict) -> str:
         "DELETE FROM Xiangwang.customer_service_performance_workload_analysis\n"
         f"WHERE `date_time` = '{biz_date}';\n"
         "INSERT INTO Xiangwang.customer_service_performance_workload_analysis\n"
-        "(`旺旺昵称`, `咨询人数`, `接待人数`, `直接接待人数`, `转入人数`, `转出人数`, `总消息`, `买家消息`, `客服消息`, `答问比`, `客服字数`, `最大同时接待`, `未回复人数`, `旺旺回复率`, `慢响应人数`, `长接待人数`, `首次响应秒`, `平均响应秒`, `平均接待秒`, `date_time`)\n"
+        "(`旺旺昵称`, `咨询人数`, `接待人数`, `直接接待人数`, `转入人数`, `转出人数`, `总消息`, `买家消息`, `客服消息`, `答问比`, `客服字数`, `最大同时接待`, `未回复人数`, `旺旺回复率`, `慢响应人数`, `长接待人数`, `首次响应秒`, `平均响应秒`, `平均接待秒`, `平均接待时长秒`, `date_time`)\n"
         "VALUES\n"
         + ",\n".join(values)
         + ";"
