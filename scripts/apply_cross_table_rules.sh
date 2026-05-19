@@ -9,11 +9,12 @@ source "${SCRIPT_DIR}/lib/common.sh"
 
 DATE="$(resolve_date_argument "$1")"
 MYSQL_CMD="$(init_mysql)"
+DATABASE="${DATABASE:-Xiangwang}"
 
 print_collection_start "跨表规则应用" "$DATE"
 
 # ============================================================
-MYSQL_EXEC="${MYSQL_CMD} xiangwang --skip-column-names"
+MYSQL_EXEC="${MYSQL_CMD} ${DATABASE} --skip-column-names"
 
 echo ""
 echo -e "${YELLOW}▶ [1/8] 阿里妈妈投放数据写入店铺日度关键数据${NC}"

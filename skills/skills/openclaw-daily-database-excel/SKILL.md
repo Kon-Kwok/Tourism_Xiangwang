@@ -38,6 +38,20 @@ python3 skills/skills/openclaw-daily-database-excel/scripts/export_daily_databas
 exports/daily_database_YYYY-MM-DD.xlsx
 ```
 
+## 表格样式
+
+所有导出的 Excel 表格统一复用阿里妈妈月汇总表风格：
+
+- 表头深蓝底：`FF305496`
+- 表头浅色字体：`FFF2F2F2`
+- 数据区白底、黑字
+- 字体：等线，11 号
+- 全表水平居中、垂直居中
+- 全表细边框
+- 表头自动换行，行高 `41.4`
+
+不要为导出表格另造颜色或底色；新增导出脚本也应复用这套样式。
+
 ## 数据库连接
 
 脚本会优先读取项目根目录 `.env`：

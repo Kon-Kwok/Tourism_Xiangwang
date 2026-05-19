@@ -3,12 +3,15 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 from datetime import date, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Iterable
 
 import openpyxl
 import pymysql
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[5]
@@ -27,6 +30,12 @@ DEFAULT_TABLES = (
 TABLE_DISPLAY_NAMES = {table_name: display_name for table_name, _, display_name in DEFAULT_TABLES}
 DATE_COLUMN_CANDIDATES = ("日期", "date_time", "order_date", "biz_date", "collection_date")
 EXCLUDE_COLUMNS = {"created_at", "updated_at"}
+NUMERIC_TEXT_RE = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$")
+HEADER_FILL = "FF305496"
+HEADER_FONT_COLOR = "FFF2F2F2"
+BODY_FONT_COLOR = "FF000000"
+BORDER_COLOR = "FFB7C3D0"
+DEFAULT_FONT = "等线"
 
 
 def load_env() -> None:
@@ -149,12 +158,52 @@ def safe_sheet_name(name: str, used: set[str]) -> str:
     return candidate
 
 
+def _convert_numeric_text(value):
+    if value is None or isinstance(value, bool):
+        return value, None
+    if isinstance(value, Decimal):
+        return float(value), None
+    if isinstance(value, (int, float)):
+        return value, None
+    if not isinstance(value, str):
+        return value, None
+
+    text = value.strip()
+    if not text:
+        return value, None
+
+    is_percent = text.endswith("%")
+    if is_percent:
+        text = text[:-1].strip()
+
+    text = text.replace(",", "").replace("，", "")
+    text = text.replace("￥", "").replace("¥", "").strip()
+    if not NUMERIC_TEXT_RE.match(text):
+        return value, None
+
+    number = float(text)
+    if is_percent:
+        return number / 100, "0.00%"
+    if number.is_integer() and "." not in text:
+        return int(number), None
+    return number, None
+
+
 def write_sheet(workbook, sheet_name: str, columns: Iterable[str], rows: Iterable[tuple], used: set[str]) -> int:
     worksheet = workbook.create_sheet(safe_sheet_name(sheet_name, used))
     worksheet.append(list(columns))
     count = 0
     for row in rows:
-        worksheet.append(list(row))
+        converted_row = []
+        number_formats = []
+        for value in row:
+            converted_value, number_format = _convert_numeric_text(value)
+            converted_row.append(converted_value)
+            number_formats.append(number_format)
+        worksheet.append(converted_row)
+        for cell, number_format in zip(worksheet[worksheet.max_row], number_formats):
+            if number_format is not None:
+                cell.number_format = number_format
         count += 1
     worksheet.freeze_panes = "A2"
     return count
@@ -270,6 +319,30 @@ def autosize_workbook(workbook) -> None:
             worksheet.column_dimensions[column_letter].width = min(max(max_length + 2, 10), 40)
 
 
+def apply_standard_table_style(workbook) -> None:
+    alignment = Alignment(horizontal="center", vertical="center")
+    header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    header_fill = PatternFill("solid", fgColor=HEADER_FILL)
+    header_font = Font(name=DEFAULT_FONT, size=11, bold=True, color=HEADER_FONT_COLOR)
+    body_font = Font(name=DEFAULT_FONT, size=11, color=BODY_FONT_COLOR)
+    thin_side = Side(style="thin", color=BORDER_COLOR)
+    thin_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
+
+    for worksheet in workbook.worksheets:
+        header_row_idx = 3 if worksheet.title == "汇总" else 1
+        for row in worksheet.iter_rows():
+            for cell in row:
+                cell.border = thin_border
+                cell.alignment = alignment
+                cell.font = body_font
+        if worksheet.max_row >= header_row_idx:
+            for cell in worksheet[header_row_idx]:
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = header_alignment
+            worksheet.row_dimensions[header_row_idx].height = 41.4
+
+
 def build_workbook(conn, args, biz_date: str, start_date: str = None, end_date: str = None):
     workbook = openpyxl.Workbook()
     workbook.remove(workbook.active)
@@ -303,6 +376,7 @@ def build_workbook(conn, args, biz_date: str, start_date: str = None, end_date: 
     _apply_cell_formats(workbook)
     _handle_delay_chat_volume(workbook, summary)
     autosize_workbook(workbook)
+    apply_standard_table_style(workbook)
     return workbook, summary
 
 

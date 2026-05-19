@@ -1,0 +1,4 @@
+interface:
+  display_name: "阿里妈妈月度汇总"
+  short_description: "按周期追加阿里妈妈投放月汇总"
+  default_prompt: "Use $export-alimama-monthly-summary to append the next Alimama monthly summary block to a workbook."
