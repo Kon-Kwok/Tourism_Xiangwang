@@ -74,7 +74,7 @@ else
         "https://fsc.fliggy.com/#/new/home"
         "https://kf.topchitu.com/web/custom-kpi/employee-kpi?id=1721&wwt=ALL"
         "https://one.alimama.com/index.html"
-        "https://branding.taobao.com/"
+        "https://branding.taobao.com/index.action"
     )
 fi
 
@@ -102,14 +102,11 @@ echo ""
 
 # 3. 启动Chrome
 echo "步骤 3/4: 启动Chrome..."
-nohup google-chrome \
+LIBGL_ALWAYS_SOFTWARE=1 nohup google-chrome \
   --remote-debugging-port=$DEBUG_PORT \
   --user-data-dir="$CONFIG_DIR" \
   --no-first-run \
   --no-default-browser-check \
-  --enable-features=UseOzonePlatform \
-  --ozone-platform=wayland \
-  --force-device-scale-factor=1.0 \
   "${START_URLS[@]}" \
   > /tmp/chrome_debug.log 2>&1 &
 
