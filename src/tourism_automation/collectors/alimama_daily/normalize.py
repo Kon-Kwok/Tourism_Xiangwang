@@ -31,15 +31,11 @@ def normalize_alimama_daily_payloads(
     channels: dict[str, dict[str, Any]] = {}
     if star_store.get("status") == "success":
         channels["star_store"] = star_store["metrics"]
-    elif star_store.get("status") == "no_data":
-        channels["star_store"] = _zero_metrics(biz_date)
 
     for scene_name, channel in SCENE_TO_CHANNEL.items():
         row = scene_rows.get(scene_name)
         if row:
             channels[channel] = _metrics_from_onebp_scene(row, biz_date=biz_date, channel=channel)
-        elif channel in {"tmall_express", "gravity_rubiks_cube"}:
-            channels[channel] = _zero_metrics(biz_date)
 
     wanxiangtai_2_rows = {
         "超级短视频": channels.get("wanxiangtai_short_video", _zero_metrics(biz_date)),

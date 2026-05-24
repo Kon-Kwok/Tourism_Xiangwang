@@ -59,7 +59,6 @@ def calculate_metrics(metrics: dict[str, Any]) -> dict[str, Decimal]:
             "0.01",
         ),
         "collection_cart_count": decimal_or_zero(metrics["shopping_cart"]) + decimal_or_zero(metrics["bookmark_product"]),
-        "cart_rate": ratio(metrics["shopping_cart"], metrics["click"], "0.000001"),
         "collection_cart_rate": ratio(
             decimal_or_zero(metrics["shopping_cart"]) + decimal_or_zero(metrics["bookmark_product"]),
             metrics["click"],
