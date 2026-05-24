@@ -6,7 +6,7 @@ import sys
 
 def _format_int(value):
     if value in (None, ""):
-        return "0"
+        return "NULL"
     return str(int(value))
 
 def _format_follow_count(value):
@@ -39,6 +39,13 @@ WHERE NOT EXISTS (
 );
 
 UPDATE Xiangwang.shop_daily_key_data
+SET total_uv = NULL,
+    total_pv = NULL,
+    流量来源广告_uv = NULL,
+    流量来源平台_uv = NULL
+WHERE 日期 = '{biz_date}';
+
+UPDATE Xiangwang.shop_daily_key_data
 SET total_uv = {_format_int(row.get('访客数'))},
     total_pv = {_format_int(row.get('浏览量'))},
     流量来源广告_uv = {_format_int(row.get('广告流量'))},
@@ -54,6 +61,10 @@ WHERE NOT EXISTS (
     FROM Xiangwang.shop_data_daily_registration
     WHERE `日期` = '{biz_date}'
 );
+
+UPDATE Xiangwang.shop_data_daily_registration
+SET `关注店铺人数` = NULL
+WHERE `日期` = '{biz_date}';
 
 UPDATE Xiangwang.shop_data_daily_registration
 SET `关注店铺人数` = {follow_count}
