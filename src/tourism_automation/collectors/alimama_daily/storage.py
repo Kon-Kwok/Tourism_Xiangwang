@@ -139,9 +139,6 @@ class AlimamaDailyStorage:
 
     def save(self, result: dict[str, Any]) -> dict[str, bool]:
         channels = result["channels"]
-        missing_channels = [channel for channel in TABLE_CHANNELS.values() if channel not in channels]
-        if missing_channels:
-            raise RuntimeError(f"Alimama daily result is missing channels: {', '.join(missing_channels)}")
         saved: dict[str, bool] = {}
         with self._connect() as conn:
             with conn.cursor() as cursor:
@@ -150,6 +147,8 @@ class AlimamaDailyStorage:
                 cursor.execute("DELETE FROM wanxiangtai_2 WHERE date_time=%s", (result["date_time"],))
 
                 for table, channel in TABLE_CHANNELS.items():
+                    if table not in channels:
+                        continue
                     fields = TABLE_FIELDS[table]
                     metrics = channels[channel]
                     values = tuple(storage_value(field, metrics[field]) for field in fields)
