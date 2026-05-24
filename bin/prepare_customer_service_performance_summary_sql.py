@@ -78,7 +78,7 @@ def build_upsert_sql(payload: dict) -> str:
                     _quote_string(str(row.get("客服昵称"))),
                     _format_int(row.get("聊天人数(原咨询人数)")),
                     _format_int(row.get("接待人数")),
-                    _format_varchar(row.get("询单人数")),
+                    _format_int(row.get("询单人数")),
                     _format_decimal(row.get("销售额"), "0.00"),
                     _format_int(row.get("销售量")),
                     _format_int(row.get("销售人数")),

@@ -131,15 +131,15 @@ def build_upsert_sql(payload: dict) -> str:
                     _format_int(value_for(row, "接待人数")),
                     _format_decimal(value_for(row, "平均响应(秒)"), "0.01"),
                     _format_decimal(value_for(row, "回复率"), "0.000"),
-                    _format_varchar(value_for(row, "询单->最终付款转化率")),
+                    _format_decimal(value_for(row, "询单->最终付款转化率"), "0.0000"),
                     _format_decimal(value_for(row, "上班天数"), "0.0"),
-                    _format_varchar(value_for(row, "服务满意度评价参与率")),
-                    _format_varchar(value_for(row, "客户满意率")),
-                    _format_varchar(value_for(row, "服务满意度评价很满意")),
-                    _format_varchar(value_for(row, "服务满意度评价满意")),
-                    _format_varchar(value_for(row, "服务满意度评价一般")),
-                    _format_varchar(value_for(row, "服务满意度评价不满")),
-                    _format_varchar(value_for(row, "服务满意度评价很不满")),
+                    _format_decimal(value_for(row, "服务满意度评价参与率"), "0.0000"),
+                    _format_decimal(value_for(row, "客户满意率"), "0.0000"),
+                    _format_int(value_for(row, "服务满意度评价很满意")),
+                    _format_int(value_for(row, "服务满意度评价满意")),
+                    _format_int(value_for(row, "服务满意度评价一般")),
+                    _format_int(value_for(row, "服务满意度评价不满")),
+                    _format_int(value_for(row, "服务满意度评价很不满")),
                 ]
             )
             + ")"
