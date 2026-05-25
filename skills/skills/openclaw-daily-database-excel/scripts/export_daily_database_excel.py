@@ -358,8 +358,6 @@ def build_workbook(conn, args, biz_date: str, start_date: str = None, end_date: 
                 columns, rows = fetch_table_range(cursor, args.database, table_name, date_column, start_date, end_date)
             else:
                 columns, rows = fetch_table(cursor, args.database, table_name, date_column, biz_date)
-            if not rows and not args.include_empty_tables:
-                continue
             row_count = write_sheet(workbook, display_name, columns, rows, used_sheet_names)
             summary.append((display_name, date_column, row_count))
 
