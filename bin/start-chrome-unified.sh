@@ -102,11 +102,16 @@ echo ""
 
 # 3. 启动Chrome
 echo "步骤 3/4: 启动Chrome..."
-LIBGL_ALWAYS_SOFTWARE=1 nohup google-chrome \
+# WSLg 的 XWayland 光标渲染在近期的 WSLg 更新后可能出现不可见问题
+# --ozone-platform=wayland: 绕过 XWayland，直接使用 Wayland 协议，光标由 Weston 直接管理
+nohup google-chrome \
   --remote-debugging-port=$DEBUG_PORT \
   --user-data-dir="$CONFIG_DIR" \
   --no-first-run \
   --no-default-browser-check \
+  --disable-gpu \
+  --disable-gpu-sandbox \
+  --ozone-platform=wayland \
   "${START_URLS[@]}" \
   > /tmp/chrome_debug.log 2>&1 &
 
