@@ -3,7 +3,7 @@
 # 用途：采集、转换、入库赤兔KPI三个报表数据
 # 使用：./scripts/kpi_reports.sh [YYYY-MM-DD]
 
-set -e  # 遇到错误立即退出
+set -eo pipefail  # 遇到错误立即退出，管道中任一命令失败即失败
 
 # 引入公共函数库
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

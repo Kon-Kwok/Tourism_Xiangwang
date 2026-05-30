@@ -18,8 +18,8 @@ TOKEN_DOMAIN_PRIORITY = (
     "taobao.com",
 )
 ORDER_LIST_TRANSIENT_ERROR = "订单搜索失败，请稍后再试"
-ORDER_LIST_MAX_ATTEMPTS = 5
-ORDER_LIST_RETRY_DELAY_SECONDS = 0.5
+ORDER_LIST_MAX_ATTEMPTS = 8
+ORDER_LIST_RETRY_DELAY_SECONDS = 2.0
 
 
 def parse_order_list_response(raw_text: str) -> dict:

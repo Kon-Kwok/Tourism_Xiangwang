@@ -3,7 +3,7 @@
 # 用途：采集、转换、入库SYCM流量数据
 # 使用：./scripts/sycm_flow.sh [YYYY-MM-DD]
 
-set -e  # 遇到错误立即退出
+set -eo pipefail  # 遇到错误立即退出
 
 # 引入公共函数库
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

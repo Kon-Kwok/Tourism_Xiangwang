@@ -4,6 +4,9 @@ from tourism_automation.collectors.fliggy_order_list.client import FliggyOrderLi
 from tourism_automation.collectors.fliggy_order_list.normalize import normalize_order_list_payload
 
 
+MAX_PAGE_SIZE = 20
+
+
 def collect_order_list(
     *,
     page_num: int,
@@ -14,6 +17,7 @@ def collect_order_list(
     deal_end: str,
     all_pages: bool = False,
 ) -> dict:
+    page_size = min(page_size, MAX_PAGE_SIZE)
     client = FliggyOrderListClient.from_local_chrome()
     payload = client.fetch_order_list(
         page_num=page_num,
