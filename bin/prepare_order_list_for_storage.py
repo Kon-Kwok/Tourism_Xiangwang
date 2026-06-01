@@ -119,7 +119,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    # Debug模式：加载真实数据进行断点调试
-    payload = json.load(open("result/orders_2026-05-27.json"))
-    result = prepare_payload_for_storage(payload)
-    print(json.dumps(result["summary"], ensure_ascii=False, indent=2))
+    raise SystemExit(main())
