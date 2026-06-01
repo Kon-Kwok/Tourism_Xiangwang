@@ -18,7 +18,11 @@ CHINESE_ROOM_CAPACITY_PREFIXES = (
     ("六人", 6),
 )
 MONEY_CLEAN_PATTERN = re.compile(r"[^\d.\-]")
-AMOUNT_ONLY_TITLE_KEYWORDS = ("补差", "尾款")
+# 非通兑订单排除关键词：仅在订单非通兑时才生效
+PAX_BK_EXCLUDE_KEYWORDS = (
+    "补差", "尾款", "升级", "升房", "升舱",
+    "税费", "补税", "改期", "改航线", "生日礼遇",
+)
 
 
 def _to_decimal(value) -> Decimal:
@@ -47,9 +51,13 @@ def _extract_room_capacity(package_type: str | None) -> int | None:
     return None
 
 
-def _is_amount_only_order(row: dict) -> bool:
-    item_title = str(row.get("item_title") or "")
-    return any(keyword in item_title for keyword in AMOUNT_ONLY_TITLE_KEYWORDS)
+def _should_skip_pax_bk(row: dict) -> bool:
+    """通兑/舱房订单永不算金额订单；仅非舱房订单检查排除关键词"""
+    package_type = row.get("package_type") or ""
+    if "通兑" in package_type:
+        return False
+    combined = f'{row.get("item_title") or ""} {package_type}'
+    return any(keyword in combined for keyword in PAX_BK_EXCLUDE_KEYWORDS)
 
 
 def _decimal_to_json_number(value: Decimal):
@@ -74,7 +82,7 @@ def prepare_payload_for_storage(payload: dict) -> dict:
         is_universal = "通兑" in (package_type or "")
         gmv += _to_decimal(row.get("actual_fee"))
 
-        if _is_amount_only_order(row):
+        if _should_skip_pax_bk(row):
             continue
 
         if is_universal and room_capacity:
