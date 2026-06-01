@@ -91,9 +91,13 @@ def prepare_payload_for_storage(payload: dict) -> dict:
         elif room_capacity:
             total_pax += buy_mount
             total_booking += buy_mount / Decimal(room_capacity)
-        else:
+        elif is_universal:
             total_pax += buy_mount
             total_booking += buy_mount
+        else:
+            # 无房型普通订单：BK 固定为 1
+            total_pax += buy_mount
+            total_booking += Decimal("1")
 
     summary = result.setdefault("summary", {})
     summary["total_pax"] = _decimal_to_json_number(total_pax)
