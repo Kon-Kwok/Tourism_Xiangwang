@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Iterable
@@ -30,6 +30,14 @@ DEFAULT_TABLES = (
 TABLE_DISPLAY_NAMES = {table_name: display_name for table_name, _, display_name in DEFAULT_TABLES}
 DATE_COLUMN_CANDIDATES = ("日期", "date_time", "order_date", "biz_date", "collection_date")
 EXCLUDE_COLUMNS = {"created_at", "updated_at"}
+ALIMAMA_CHANNELS = ("明星店铺", "直通车", "引力魔方", "万相台")
+ALIMAMA_TABLE_MAP = {
+    "明星店铺": "star_store",
+    "直通车": "tmall_express",
+    "引力魔方": "gravity_rubiks_cube",
+    "万相台": "wanxiangtai",
+}
+ALIMAMA_BASE_METRICS = ("cost", "imp", "click", "order", "sales", "shopping_cart", "bookmark_product", "bookmark_store")
 NUMERIC_TEXT_RE = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$")
 HEADER_FILL = "FF305496"
 HEADER_FONT_COLOR = "FFF2F2F2"
@@ -308,6 +316,228 @@ def _handle_delay_chat_volume(workbook, summary: list) -> None:
             chat_cell.number_format = "@"
 
 
+DELAY_COLUMNS: dict[str, set[str]] = {
+    "赤兔-人均日接入": {
+        "询单最终付款成功率",
+        "评价发送率",
+        "客户满意比",
+        "很满意",
+        "满意",
+        "一般",
+        "不满意",
+        "很不满意",
+    },
+    "赤兔-每周店铺个人数据": {
+        "询单人数",
+    },
+}
+
+
+def _handle_delay_kpi_fields(workbook) -> None:
+    for worksheet in workbook.worksheets:
+        delay_cols = DELAY_COLUMNS.get(worksheet.title)
+        if not delay_cols:
+            continue
+        header_row = worksheet[1]
+        col_indices: dict[str, int] = {}
+        for idx, cell in enumerate(header_row):
+            if cell.value in delay_cols:
+                col_indices[cell.value] = idx
+        if not col_indices:
+            continue
+        for row in worksheet.iter_rows(min_row=2):
+            for col_name, col_idx in col_indices.items():
+                cell = row[col_idx]
+                if cell.value is None:
+                    cell.value = "延迟统计"
+                    cell.number_format = "@"
+
+
+def _monthly_period_for_date(ref_date: date) -> tuple[date, date, str]:
+    if ref_date.month == 1 and ref_date.day <= 20:
+        start, end, label = date(ref_date.year, 1, 1), date(ref_date.year, 1, 20), f"{ref_date.year}年1月"
+    elif ref_date.day <= 20:
+        start = date(ref_date.year, ref_date.month - 1, 21)
+        end = date(ref_date.year, ref_date.month, 20)
+        label = f"{start.month}月{start.day}号-{end.month}月{end.day}号"
+    elif ref_date.month == 12:
+        start, end, label = date(ref_date.year, 11, 21), date(ref_date.year, 12, 31), "11月21号-12月31号"
+    else:
+        start = date(ref_date.year, ref_date.month, 21)
+        end = date(ref_date.year, ref_date.month + 1, 20)
+        label = f"{start.month}月{start.day}号-{end.month}月{end.day}号"
+    return start, end, label
+
+
+def _previous_period(start: date) -> tuple[date, date, str]:
+    prev_end = start - timedelta(days=1)
+    if start == date(start.year, 1, 1):
+        return date(start.year - 1, 11, 21), date(start.year - 1, 12, 31), "11月21号-12月31号"
+    if start.day == 21:
+        return date(start.year, start.month - 1, 21), date(start.year, start.month, 20), f"{start.month - 1}月21号-{start.month}月20号"
+    return date(start.year, start.month - 1, 21), date(start.year, start.month, 20), f"{start.month - 1}月21号-{start.month}月20号"
+
+
+def _parse_alimama_number(value) -> float:
+    if value is None or isinstance(value, bool):
+        return 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, Decimal):
+        return float(value)
+    if not isinstance(value, str):
+        return 0.0
+    text = value.strip()
+    if not text or text == "-":
+        return 0.0
+    text = text.replace(",", "").replace("，", "").replace("￥", "").replace("¥", "").replace("%", "")
+    try:
+        return float(text)
+    except ValueError:
+        return 0.0
+
+
+def _fetch_alimama_aggregate(cursor, database: str, channel_tables: list[str], start: date, end: date) -> dict[str, dict[str, float]]:
+    result: dict[str, dict[str, float]] = {}
+    for channel, table in ALIMAMA_TABLE_MAP.items():
+        cursor.execute(
+            f"SELECT date_time, cost, imp, click, order_count, sales, shopping_cart, bookmark_product, bookmark_store "
+            f"FROM `{database}`.`{table}` WHERE date_time BETWEEN %s AND %s",
+            (start.isoformat(), end.isoformat()),
+        )
+        totals = {key: 0.0 for key in ALIMAMA_BASE_METRICS}
+        total_bookmark = 0.0
+        for row in cursor.fetchall():
+            totals["cost"] += _parse_alimama_number(row[1])
+            totals["imp"] += _parse_alimama_number(row[2])
+            totals["click"] += _parse_alimama_number(row[3])
+            totals["order"] += _parse_alimama_number(row[4])
+            totals["sales"] += _parse_alimama_number(row[5])
+            totals["shopping_cart"] += _parse_alimama_number(row[6])
+            totals["bookmark_product"] += _parse_alimama_number(row[7])
+            totals["bookmark_store"] += _parse_alimama_number(row[8])
+        totals["bookmark_total"] = totals["bookmark_product"] + totals["bookmark_store"]
+        result[channel] = totals
+    return result
+
+
+def build_alimama_monthly_sheet(workbook, conn, args, biz_date_str: str, used_names: set[str]) -> None:
+    biz_date = datetime.strptime(biz_date_str, "%Y-%m-%d").date()
+    period_start, period_end, period_label = _monthly_period_for_date(biz_date)
+    prev_start, prev_end, _ = _previous_period(period_start)
+
+    with conn.cursor() as cursor:
+        current_data = _fetch_alimama_aggregate(cursor, args.database, list(ALIMAMA_TABLE_MAP.values()), period_start, period_end)
+        previous_data = _fetch_alimama_aggregate(cursor, args.database, list(ALIMAMA_TABLE_MAP.values()), prev_start, prev_end)
+
+    sheet_name = safe_sheet_name("阿里妈妈月汇总", used_names)
+    ws = workbook.create_sheet(sheet_name)
+
+    headers = [
+        "", "花费", "展示", "点击", "订单", "销量",
+        "加入购物车", "宝贝收藏", "店铺收藏", "总收藏数",
+        "CTR", "CPC", "CPM", "ROI", "CVR",
+        "ASP", "订单成本", "加购成本", "收藏加购数",
+        "收藏加购环比", "花费占比", "花费环比",
+        "点击占比", "加购环比", "成交环比",
+        "加购成本环比", "收藏加购成本环比", "费率",
+    ]
+    ws.append(headers)
+
+    def write_period_block(label: str, data: dict, prev_data: dict | None = None):
+        ws.append([label] + [""] * (len(headers) - 1))
+        block_start = ws.max_row + 1
+        for channel in ALIMAMA_CHANNELS:
+            d = data.get(channel, {})
+            row_num = ws.max_row + 1
+            cost = d.get("cost", 0)
+            imp = d.get("imp", 0)
+            click = d.get("click", 0)
+            order = d.get("order", 0)
+            sales = d.get("sales", 0)
+            cart = d.get("shopping_cart", 0)
+            bp = d.get("bookmark_product", 0)
+            bs = d.get("bookmark_store", 0)
+            bm_total = d.get("bookmark_total", 0)
+            collection_total = cart + bm_total
+
+            ws.append([
+                channel, cost, imp, click, order, sales,
+                cart, bp, bs, bm_total,
+                f"=D{row_num}/C{row_num}",          # CTR
+                f"=B{row_num}/D{row_num}",          # CPC
+                f"=(B{row_num}/C{row_num})*1000",    # CPM
+                f"=F{row_num}/B{row_num}",          # ROI
+                f"=E{row_num}/D{row_num}",          # CVR
+                f"=IF(E{row_num}=0,0,F{row_num}/E{row_num})",  # ASP
+                f"=IF(E{row_num}=0,0,B{row_num}/E{row_num})",  # 订单成本
+                f"=B{row_num}/G{row_num}",          # 加购成本
+                f"=G{row_num}+J{row_num}",          # 收藏加购数
+            ] + ([
+                "",                                  # 环比 (filled if prev_data)
+                "",                                  # 花费占比 (filled below)
+                "",                                  # 花费环比
+                "",                                  # 点击占比
+                "",                                  # 加购环比
+                "",                                  # 成交环比
+                "",                                  # 加购成本环比
+                "",                                  # 收藏加购成本环比
+                "",                                  # 费率
+            ]))
+
+        total_row = ws.max_row + 1
+        ws.append(["总计"] + [f"=SUM({chr(65+c)}{block_start}:{chr(65+c)}{total_row-1})" for c in range(1, 10)] + [""] * (len(headers) - 10))
+        for col_idx in range(11, 20):
+            letter = openpyxl.utils.get_column_letter(col_idx)
+            ws.cell(total_row, col_idx).value = f"={letter}{total_row - 1}"
+        # Total row has some different formulas
+        # Re-derive total row formulas from totals
+        ws.cell(total_row, 11).value = f"=D{total_row}/C{total_row}"  # CTR
+        ws.cell(total_row, 12).value = f"=B{total_row}/D{total_row}"  # CPC
+        ws.cell(total_row, 13).value = f"=(B{total_row}/C{total_row})*1000"  # CPM
+        ws.cell(total_row, 14).value = f"=F{total_row}/B{total_row}"  # ROI
+        ws.cell(total_row, 15).value = f"=E{total_row}/D{total_row}"  # CVR
+        ws.cell(total_row, 16).value = f"=IF(E{total_row}=0,0,F{total_row}/E{total_row})"  # ASP
+        ws.cell(total_row, 17).value = f"=IF(E{total_row}=0,0,B{total_row}/E{total_row})"  # 订单成本
+        ws.cell(total_row, 18).value = f"=B{total_row}/G{total_row}"  # 加购成本
+        ws.cell(total_row, 19).value = f"=G{total_row}+J{total_row}"  # 收藏加购数
+        ws.cell(total_row, 21).value = f"=B{total_row}/B{total_row}"  # 花费占比 (total = 100%)
+        ws.cell(total_row, 29).value = f"=B{total_row}/F{total_row}"  # 费率
+
+        return block_start, total_row
+
+    current_start, current_total = write_period_block(period_label, current_data)
+    prev_start, prev_total = write_period_block(f"{prev_start.month}月{prev_start.day}号-{prev_end.month}月{prev_end.day}号", previous_data)
+
+    # Now fill in 环比 and 占比 formulas for current period rows
+    for offset, channel in enumerate(ALIMAMA_CHANNELS):
+        curr_row = current_start + offset
+        prev_row = prev_start + offset
+        current_total_row = current_total
+        # 收藏加购环比 (col 20 = T)
+        ws.cell(curr_row, 20).value = f'=IF(S{prev_row}=0,"",(S{curr_row}-S{prev_row})/S{prev_row})'
+        # 花费占比 (col 21 = U)
+        ws.cell(curr_row, 21).value = f"=B{curr_row}/$B${current_total_row}"
+        # 花费环比 (col 22 = V)
+        ws.cell(curr_row, 22).value = f'=IF(B{prev_row}=0,"",(B{curr_row}-B{prev_row})/B{prev_row})'
+        # 点击占比 (col 23 = W)
+        ws.cell(curr_row, 23).value = f"=D{curr_row}/$D${current_total_row}"
+        # 加购环比 (col 24 = X)
+        ws.cell(curr_row, 24).value = f'=IF(G{prev_row}=0,"",(G{curr_row}-G{prev_row})/G{prev_row})'
+        # 成交环比 (col 25 = Y)
+        ws.cell(curr_row, 25).value = f'=IF(F{prev_row}=0,"",(F{curr_row}-F{prev_row})/F{prev_row})'
+        # 加购成本环比 (col 26 = Z)
+        ws.cell(curr_row, 26).value = f'=IF(R{prev_row}=0,"",(R{curr_row}-R{prev_row})/R{prev_row})'
+        # 收藏加购成本环比 (col 27 = AA)
+        ws.cell(curr_row, 27).value = f'=IF(U{prev_row}=0,"",(U{curr_row}-U{prev_row})/U{prev_row})'
+
+    # Hide the previous period rows
+    for row in range(prev_start - 1, prev_total + 1):
+        ws.row_dimensions[row].hidden = True
+
+    ws.freeze_panes = "B3"
+
+
 def autosize_workbook(workbook) -> None:
     for worksheet in workbook.worksheets:
         for column_cells in worksheet.columns:
@@ -361,6 +591,8 @@ def build_workbook(conn, args, biz_date: str, start_date: str = None, end_date: 
             row_count = write_sheet(workbook, display_name, columns, rows, used_sheet_names)
             summary.append((display_name, date_column, row_count))
 
+    build_alimama_monthly_sheet(workbook, conn, args, biz_date or end_date, used_sheet_names)
+
     overview = workbook.create_sheet("汇总", 0)
     if range_mode:
         overview.append(["日期范围", f"{start_date} 至 {end_date}", "", ""])
@@ -373,6 +605,7 @@ def build_workbook(conn, args, biz_date: str, start_date: str = None, end_date: 
     overview.freeze_panes = "A4"
     _apply_cell_formats(workbook)
     _handle_delay_chat_volume(workbook, summary)
+    _handle_delay_kpi_fields(workbook)
     autosize_workbook(workbook)
     apply_standard_table_style(workbook)
     return workbook, summary
