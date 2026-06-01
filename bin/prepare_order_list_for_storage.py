@@ -105,7 +105,13 @@ def prepare_payload_for_storage(payload: dict) -> dict:
 
 
 def main() -> int:
-    payload = json.load(sys.stdin)
+    # 支持命令行参数传入JSON文件路径，否则从stdin读取
+    if len(sys.argv) > 1:
+        with open(sys.argv[1]) as f:
+            payload = json.load(f)
+    else:
+        payload = json.load(sys.stdin)
+
     result = prepare_payload_for_storage(payload)
     json.dump(result, sys.stdout, ensure_ascii=False, indent=2)
     sys.stdout.write("\n")
@@ -113,4 +119,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    # Debug模式：加载真实数据进行断点调试
+    payload = json.load(open("result/orders_2026-05-27.json"))
+    result = prepare_payload_for_storage(payload)
+    print(json.dumps(result["summary"], ensure_ascii=False, indent=2))
