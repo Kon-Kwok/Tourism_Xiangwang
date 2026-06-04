@@ -51,7 +51,7 @@ SHEET_COLUMN_EXCLUSIONS: dict[str, set[str]] = {
     "阿里妈妈-直通车": {"id", "collection_cart_cost", "collection_cart_count", "collection_cart_rate"},
     "阿里妈妈-引力魔方": {"id", "collection_cart_cost", "collection_cart_count", "collection_cart_rate"},
     "阿里妈妈-万相台": {"id", "bookmark_store", "collection_cart_cost", "collection_cart_count", "collection_cart_rate"},
-    "店铺日度关键数据": {"id", "super_recommendation_cost"},
+    "店铺日度关键数据": {"id"},
 }
 
 SHEET_DATE_REFORMAT: dict[str, str] = {
@@ -90,7 +90,11 @@ SHEET_DECIMAL_FORMATS: dict[str, dict[str, str]] = {
 }
 
 SHEET_COL_RANGE_FORMATS: dict[str, list[tuple[int, int, str]]] = {
-    "店铺日度关键数据": [(26, 30, "0.00")],  # AA-AD columns (0-indexed 26-29)
+    "店铺日度关键数据": [
+        (24, 25, "#,##0.00"),   # Y: cost_total
+        (25, 27, "#,##0"),       # Z-AA: imp_total, click_total
+        (27, 31, "0.00"),        # AB-AE: booked_cabin × 4
+    ],
 }
 
 
@@ -351,13 +355,14 @@ def _handle_delay_chat_volume(workbook, summary: list) -> None:
     for idx, cell in enumerate(header_row):
         if cell.value == "日期":
             date_col_idx = idx
-        elif cell.value == "chat_volume":
+        elif cell.value in ("chat_volume", "Chat Volume\n(询单量)"):
             chat_col_idx = idx
     if date_col_idx is None or chat_col_idx is None:
         return
 
+    data_start_row = 3 if ws.title == "店铺日度关键数据" else 2
     dates = set()
-    for row in ws.iter_rows(min_row=2, values_only=True):
+    for row in ws.iter_rows(min_row=data_start_row, values_only=True):
         d = row[date_col_idx]
         if isinstance(d, date):
             dates.add(d)
@@ -366,7 +371,7 @@ def _handle_delay_chat_volume(workbook, summary: list) -> None:
     if max_date is None:
         return
 
-    for row in ws.iter_rows(min_row=2):
+    for row in ws.iter_rows(min_row=data_start_row):
         date_cell = row[date_col_idx]
         chat_cell = row[chat_col_idx]
         if isinstance(date_cell.value, date) and date_cell.value == max_date and chat_cell.value == 0:
@@ -666,12 +671,96 @@ def build_alimama_monthly_sheet(workbook, conn, args, biz_date_str: str, used_na
     ws.freeze_panes = "B3"
 
 
+ALIMAMA_BUDGET_CHANNELS = [
+    ("Pingxiaobao(品销宝）", "star_store", "cost", "imp", "click"),
+    ("Tmall Express（直通车）", "tmall_express", "cost", "imp", "click"),
+    ("Gravity rubik's cube（引力魔方）", "gravity_rubiks_cube", "cost", "imp", "click"),
+    ("wanxiangtai（万相台）", "wanxiangtai", "cost", "imp", "click"),
+]
+
+
+def build_alimama_budget_sheet(workbook, conn, database: str, biz_date: str, used_names: set[str]) -> None:
+    """Build 阿里妈妈预算明细 sheet with Budget/Act.Cost/IMP/Click per channel."""
+    sheet_name = safe_sheet_name("阿里妈妈预算明细", used_names)
+    ws = workbook.create_sheet(sheet_name)
+
+    # Row 2: sub-headers
+    sub_headers = []
+    for _ in range(4):
+        sub_headers.extend(["Budget", "Act. Cost", "IMP", "Click"])
+    ws.append(["Date"] + sub_headers + ["Remark"])
+    # Row 1: main headers with merged cells
+    ws.insert_rows(1)
+    ws.cell(1, 1, "Date")
+    for i, (label, _, _, _, _) in enumerate(ALIMAMA_BUDGET_CHANNELS):
+        start_col = 2 + i * 4
+        end_col = start_col + 3
+        ws.cell(1, start_col, label)
+        ws.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=end_col)
+    ws.cell(1, 18, "Remark")
+    ws.merge_cells("A1:A2")
+    ws.merge_cells("R1:R2")
+
+    # Fetch data
+    with conn.cursor() as cursor:
+        for _, table, cost_col, imp_col, click_col in ALIMAMA_BUDGET_CHANNELS:
+            cursor.execute(
+                f"SELECT date_time, `{cost_col}`, `{imp_col}`, `{click_col}` "
+                f"FROM `{database}`.`{table}` WHERE date_time = %s",
+                (biz_date,),
+            )
+
+    # Single date: build one data row
+    from math import ceil
+    from datetime import datetime as dt_type
+    biz_dt = dt_type.strptime(biz_date, "%Y-%m-%d")
+
+    with conn.cursor() as cursor:
+        row_data = [biz_dt]
+        for _, table, cost_col, imp_col, click_col in ALIMAMA_BUDGET_CHANNELS:
+            cursor.execute(
+                f"SELECT `{cost_col}`, `{imp_col}`, `{click_col}` "
+                f"FROM `{database}`.`{table}` WHERE date_time = %s",
+                (biz_date,),
+            )
+            result = cursor.fetchone()
+            if result:
+                cost = _parse_alimama_number(result[0])
+                imp = int(_parse_alimama_number(result[1]))
+                click = int(_parse_alimama_number(result[2]))
+            else:
+                cost, imp, click = 0, 0, 0
+            # Budget: round up to nearest 500
+            budget = ceil(cost / 500) * 500 if cost > 0 else 0
+            row_data.extend([budget, cost, imp, click])
+        row_data.append("")
+        ws.append(row_data)
+
+    # Apply number formats
+    row_num = 3
+    date_fmt = "YYYY/MM/DD"
+    budget_fmt = '_ \\¥ * #,##0_ ;_ \\¥ * \\-#,##0_ ;_ \\¥ * "-"??_ ;_ @_ '
+    cost_fmt = '"￥"#,##0.00;"￥"\\-#,##0.00'
+    imp_click_fmt = "#,##0"
+
+    ws.cell(row_num, 1).number_format = date_fmt
+    for ch_idx in range(4):
+        base = 2 + ch_idx * 4
+        ws.cell(row_num, base).number_format = budget_fmt      # Budget
+        ws.cell(row_num, base + 1).number_format = cost_fmt     # Act. Cost
+        ws.cell(row_num, base + 2).number_format = imp_click_fmt  # IMP
+        ws.cell(row_num, base + 3).number_format = imp_click_fmt  # Click
+
+    ws.freeze_panes = "A3"
+
+
 def autosize_workbook(workbook) -> None:
     for worksheet in workbook.worksheets:
-        for column_cells in worksheet.columns:
+        for col_idx in range(1, worksheet.max_column + 1):
             max_length = 0
-            column_letter = column_cells[0].column_letter
-            for cell in column_cells[:100]:
+            column_letter = openpyxl.utils.get_column_letter(col_idx)
+            for row_idx in range(1, min(101, worksheet.max_row + 1)):
+                cell = worksheet.cell(row_idx, col_idx)
                 if cell.value is not None:
                     max_length = max(max_length, len(str(cell.value)))
             worksheet.column_dimensions[column_letter].width = min(max(max_length + 2, 10), 40)
@@ -682,6 +771,7 @@ def apply_standard_table_style(workbook) -> None:
     header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
     header_fill = PatternFill("solid", fgColor=HEADER_FILL)
     header_font = Font(name=DEFAULT_FONT, size=11, bold=True, color=HEADER_FONT_COLOR)
+    sub_header_font = Font(name=DEFAULT_FONT, size=10, bold=True, color=BODY_FONT_COLOR)
     body_font = Font(name=DEFAULT_FONT, size=11, color=BODY_FONT_COLOR)
     thin_side = Side(style="thin", color=BORDER_COLOR)
     thin_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
@@ -693,11 +783,124 @@ def apply_standard_table_style(workbook) -> None:
                 cell.alignment = alignment
                 cell.font = body_font
         if worksheet.max_row >= 1:
-            for cell in worksheet[1]:
+            for col_idx in range(1, worksheet.max_column + 1):
+                cell = worksheet.cell(1, col_idx)
                 cell.fill = header_fill
                 cell.font = header_font
                 cell.alignment = header_alignment
             worksheet.row_dimensions[1].height = 41.4
+        # Style row 2 as sub-header for sheets with merged headers
+        if worksheet.title == "店铺日度关键数据" and worksheet.max_row >= 2:
+            for col_idx in range(1, worksheet.max_column + 1):
+                cell = worksheet.cell(2, col_idx)
+                cell.font = sub_header_font
+                cell.alignment = header_alignment
+            worksheet.row_dimensions[2].height = 30
+
+
+SHOP_DAILY_KEY_HEADERS = [
+    # (col_idx, row1_header, row2_header, db_column, merge_end_col)
+    # merge_end_col=None means no merge; merge_end_col=col_letter means merge row1 from current to that col
+    (0, '日期', '', '日期', None),
+    (1, 'Total PV\n(总浏览数)', '', 'total_pv', None),
+    (2, 'Total UV\n(总访客数)', '', 'total_uv', None),
+    (3, '流量来源\n广告UV', '', '流量来源广告_uv', None),
+    (4, '流量来源\n平台UV', '', '流量来源平台_uv', None),
+    (5, '流量来源汇总', '', '流量来源汇总', None),
+    (6, '直引万品点击量', '', '直引万品点击量', None),
+    (7, 'Chat Volume\n(询单量)', '', 'chat_volume', None),
+    (8, 'Total Bookings\n(总售卖件数)', '', 'total_bookings', None),
+    (9, 'Total\nPAX\n(总售卖乘客数)', '', 'total_pax', None),
+    (10, 'GMV', '', 'gmv', None),
+    (11, 'Pingxiaobao\n(品销宝)', '(Cost)\n费用', 'pingxiaobao_cost', 'N'),
+    (12, '', 'IMP\n（展示）', 'pingxiaobao_imp', None),
+    (13, '', 'Click\n（点击）', 'pingxiaobao_click', None),
+    (14, 'Tmall Express\n(直通车)', '(Cost)\n费用', 'tmall_express_cost', 'Q'),
+    (15, '', 'IMP\n（展示）', 'tmall_express_imp', None),
+    (16, '', 'Click\n（点击）', 'tmall_express_click', None),
+    (17, "Gravity rubik's cube\n（引力魔方）", '(Cost)\n费用', 'gravity_rubiks_cube_cost', 'T'),
+    (18, '', 'IMP\n（展示）', 'gravity_rubiks_cube_imp', None),
+    (19, '', 'Click\n（点击）', 'gravity_rubiks_cube_click', None),
+    (20, 'Mansa-dae\n（万相台）', '(Cost)\n费用', 'mansa_dae_cost', 'W'),
+    (21, '', 'Views\n（观看量）', 'mansa_dae_views', None),
+    (22, '', 'Click\n（点击）', 'mansa_dae_click', None),
+    (23, 'Super Recommendation\n(超推Cost)', '', 'super_recommendation_cost', None),
+    (24, 'Cost Total', '', 'cost_total', None),
+    (25, 'IMP Total', '', 'imp_total', None),
+    (26, 'Click Total', '', 'click_total', None),
+    (27, 'Pingxiaobao\n(品销宝Booked Cabin)', '', 'pingxiaobao_booked_cabin', None),
+    (28, 'Tmall Express\n(直通车Booked Cabin)', '', 'tmall_express_booked_cabin', None),
+    (29, "Gravity rubik's cube\n(引力Booked Cabin)", '', 'gravity_rubiks_cube_booked_cabin', None),
+    (30, 'Mansa-dae\n(万相台Booked Cabin)', '', 'mansa_dae_booked_cabin', None),
+    (31, '', '', None, None),  # empty separator AF
+    (32, 'pax均价', '', None, None),  # AG - computed
+    (33, 'Pingxiaobao\n(品销宝Booked Amount)', '', None, None),  # AH - computed
+    (34, 'Tmall Express\n(直通车Booked Amount)', '', None, None),  # AI - computed
+    (35, "Gravity rubik's cube\n(引力Booked Amount)", '', None, None),  # AJ - computed
+    (36, 'Mansa-dae\n(万相台Booked Amount)', '', None, None),  # AK - computed
+]
+
+
+def build_shop_daily_key_sheet(workbook, conn, database: str, biz_date: str, used_names: set[str]) -> None:
+    """Build 店铺日度关键数据 sheet with two-row headers matching Fliggy Raw Data spec."""
+    from datetime import datetime as dt_type
+
+    sheet_name = safe_sheet_name("店铺日度关键数据", used_names)
+    ws = workbook.create_sheet(sheet_name)
+
+    # Row 1: main headers
+    for spec in SHOP_DAILY_KEY_HEADERS:
+        col_idx, h1, h2, _, merge_end = spec
+        ws.cell(1, col_idx + 1, h1)
+
+    # Row 2: sub-headers
+    for spec in SHOP_DAILY_KEY_HEADERS:
+        col_idx, h1, h2, _, merge_end = spec
+        if h2:
+            ws.cell(2, col_idx + 1, h2)
+
+    # Merge cells for channel groups in row 1
+    for spec in SHOP_DAILY_KEY_HEADERS:
+        col_idx, h1, h2, _, merge_end = spec
+        if merge_end:
+            ws.merge_cells(start_row=1, start_column=col_idx + 1, end_row=1, end_column=openpyxl.utils.column_index_from_string(merge_end))
+
+    # Fetch data
+    with conn.cursor() as cursor:
+        columns, rows = fetch_table(cursor, database, "shop_daily_key_data", "日期", biz_date, "店铺日度关键数据")
+
+    # Build column index map
+    col_map = {col: idx for idx, col in enumerate(columns)}
+
+    for row_data in rows:
+        row_dict = dict(zip(columns, row_data))
+        out_row = []
+        for spec in SHOP_DAILY_KEY_HEADERS:
+            col_idx, h1, h2, db_col, merge_end = spec
+            if db_col is not None:
+                out_row.append(row_dict.get(db_col))
+            else:
+                out_row.append(None)
+        ws.append(out_row)
+
+        row_num = ws.max_row
+        # Computed fields
+        gmv = row_dict.get('gmv', 0) or 0
+        total_pax = row_dict.get('total_pax', 0) or 0
+        pingxiaobao_cost = row_dict.get('pingxiaobao_cost', 0) or 0
+        pingxiaobao_cabin = row_dict.get('pingxiaobao_booked_cabin', 0) or 0
+        tmall_cost = row_dict.get('tmall_express_cost', 0) or 0
+        tmall_cabin = row_dict.get('tmall_express_booked_cabin', 0) or 0
+        gravity_cost = row_dict.get('gravity_rubiks_cube_cost', 0) or 0
+        gravity_cabin = row_dict.get('gravity_rubiks_cube_booked_cabin', 0) or 0
+        mansa_cost = row_dict.get('mansa_dae_cost', 0) or 0
+        mansa_cabin = row_dict.get('mansa_dae_booked_cabin', 0) or 0
+
+        for computed_col in range(33, 38):  # AG-AK: pax均价 + 4×Booked Amount = 0
+            ws.cell(row_num, computed_col, 0)
+
+    # Freeze panes at A3
+    ws.freeze_panes = "A3"
 
 
 def build_workbook(conn, args, biz_date: str, start_date: str = None, end_date: str = None):
@@ -711,6 +914,10 @@ def build_workbook(conn, args, biz_date: str, start_date: str = None, end_date: 
         tables = all_date_tables(cursor, args.database) if args.all_date_tables else existing_default_tables(cursor, args.database)
 
         for table_name, date_column, display_name in tables:
+            if display_name == "店铺日度关键数据" and not range_mode:
+                build_shop_daily_key_sheet(workbook, conn, args.database, biz_date, used_sheet_names)
+                summary.append((display_name, date_column, 1))
+                continue
             if range_mode:
                 columns, rows = fetch_table_range(cursor, args.database, table_name, date_column, start_date, end_date, display_name)
             else:
@@ -719,6 +926,7 @@ def build_workbook(conn, args, biz_date: str, start_date: str = None, end_date: 
             summary.append((display_name, date_column, row_count))
 
     build_alimama_monthly_sheet(workbook, conn, args, biz_date or end_date, used_sheet_names)
+    build_alimama_budget_sheet(workbook, conn, args.database, biz_date or end_date, used_sheet_names)
 
     _apply_cell_formats(workbook)
     _apply_date_reformat(workbook)
