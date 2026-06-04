@@ -91,9 +91,9 @@ SHEET_DECIMAL_FORMATS: dict[str, dict[str, str]] = {
 
 SHEET_COL_RANGE_FORMATS: dict[str, list[tuple[int, int, str]]] = {
     "店铺日度关键数据": [
-        (24, 25, "#,##0.00"),   # Y: cost_total
-        (25, 27, "#,##0"),       # Z-AA: imp_total, click_total
-        (27, 31, "0.00"),        # AB-AE: booked_cabin × 4
+        (23, 24, "#,##0.00"),   # X: cost_total
+        (24, 26, "#,##0"),       # Y-Z: imp_total, click_total
+        (26, 30, "0.00"),        # AA-AD: booked_cabin × 4
     ],
 }
 
@@ -671,6 +671,36 @@ def build_alimama_monthly_sheet(workbook, conn, args, biz_date_str: str, used_na
     ws.freeze_panes = "B3"
 
 
+def _apply_monthly_summary_formats(workbook) -> None:
+    """Apply currency/thousand-sep/percentage/accounting formats to 阿里妈妈月汇总."""
+    currency_cols = {"花费", "销量", "CTR", "CPC", "CVR", "ASP", "订单成本", "加购成本"}
+    thousand_cols = {"展示", "点击", "订单", "加入购物车", "宝贝收藏", "店铺收藏"}
+    for worksheet in workbook.worksheets:
+        if worksheet.title != "阿里妈妈月汇总":
+            continue
+        header_row = worksheet[1]
+        col_map: dict[str, int] = {}
+        for idx, cell in enumerate(header_row):
+            if cell.value in currency_cols | thousand_cols | {"ROI", "CPM"}:
+                col_map[cell.value] = idx
+
+        for row in worksheet.iter_rows(min_row=2):
+            for col_name, col_idx in col_map.items():
+                cell = row[col_idx]
+                if col_name in currency_cols:
+                    if cell.value is not None:
+                        cell.number_format = '￥#,##0.00'
+                elif col_name in thousand_cols:
+                    if cell.value is not None:
+                        cell.number_format = '#,##0'
+                elif col_name == "ROI":
+                    if cell.value is not None:
+                        cell.number_format = '0.00%'
+                elif col_name == "CPM":
+                    if cell.value is not None:
+                        cell.number_format = '_ \\¥ * #,##0.00_ ;_ \\¥ * \\-#,##0.00_ ;_ \\¥ * "-"??_ ;_ @_ '
+
+
 ALIMAMA_BUDGET_CHANNELS = [
     ("Pingxiaobao(品销宝）", "star_store", "cost", "imp", "click"),
     ("Tmall Express（直通车）", "tmall_express", "cost", "imp", "click"),
@@ -824,20 +854,19 @@ SHOP_DAILY_KEY_HEADERS = [
     (20, 'Mansa-dae\n（万相台）', '(Cost)\n费用', 'mansa_dae_cost', 'W'),
     (21, '', 'Views\n（观看量）', 'mansa_dae_views', None),
     (22, '', 'Click\n（点击）', 'mansa_dae_click', None),
-    (23, 'Super Recommendation\n(超推Cost)', '', 'super_recommendation_cost', None),
-    (24, 'Cost Total', '', 'cost_total', None),
-    (25, 'IMP Total', '', 'imp_total', None),
-    (26, 'Click Total', '', 'click_total', None),
-    (27, 'Pingxiaobao\n(品销宝Booked Cabin)', '', 'pingxiaobao_booked_cabin', None),
-    (28, 'Tmall Express\n(直通车Booked Cabin)', '', 'tmall_express_booked_cabin', None),
-    (29, "Gravity rubik's cube\n(引力Booked Cabin)", '', 'gravity_rubiks_cube_booked_cabin', None),
-    (30, 'Mansa-dae\n(万相台Booked Cabin)', '', 'mansa_dae_booked_cabin', None),
-    (31, '', '', None, None),  # empty separator AF
-    (32, 'pax均价', '', None, None),  # AG - computed
-    (33, 'Pingxiaobao\n(品销宝Booked Amount)', '', None, None),  # AH - computed
-    (34, 'Tmall Express\n(直通车Booked Amount)', '', None, None),  # AI - computed
-    (35, "Gravity rubik's cube\n(引力Booked Amount)", '', None, None),  # AJ - computed
-    (36, 'Mansa-dae\n(万相台Booked Amount)', '', None, None),  # AK - computed
+    (23, 'Cost Total', '', 'cost_total', None),
+    (24, 'IMP Total', '', 'imp_total', None),
+    (25, 'Click Total', '', 'click_total', None),
+    (26, 'Pingxiaobao\n(品销宝Booked Cabin)', '', 'pingxiaobao_booked_cabin', None),
+    (27, 'Tmall Express\n(直通车Booked Cabin)', '', 'tmall_express_booked_cabin', None),
+    (28, "Gravity rubik's cube\n(引力Booked Cabin)", '', 'gravity_rubiks_cube_booked_cabin', None),
+    (29, 'Mansa-dae\n(万相台Booked Cabin)', '', 'mansa_dae_booked_cabin', None),
+    (30, '', '', None, None),  # empty separator AF
+    (31, 'pax均价', '', None, None),  # AG - computed
+    (32, 'Pingxiaobao\n(品销宝Booked Amount)', '', None, None),  # AH - computed
+    (33, 'Tmall Express\n(直通车Booked Amount)', '', None, None),  # AI - computed
+    (34, "Gravity rubik's cube\n(引力Booked Amount)", '', None, None),  # AJ - computed
+    (35, 'Mansa-dae\n(万相台Booked Amount)', '', None, None),  # AK - computed
 ]
 
 
@@ -896,7 +925,7 @@ def build_shop_daily_key_sheet(workbook, conn, database: str, biz_date: str, use
         mansa_cost = row_dict.get('mansa_dae_cost', 0) or 0
         mansa_cabin = row_dict.get('mansa_dae_booked_cabin', 0) or 0
 
-        for computed_col in range(33, 38):  # AG-AK: pax均价 + 4×Booked Amount = 0
+        for computed_col in range(32, 37):  # AF-AJ: pax均价 + 4×Booked Amount = 0
             ws.cell(row_num, computed_col, 0)
 
     # Freeze panes at A3
@@ -932,6 +961,7 @@ def build_workbook(conn, args, biz_date: str, start_date: str = None, end_date: 
     _apply_date_reformat(workbook)
     _apply_currency_separator_formats(workbook)
     _apply_col_range_formats(workbook)
+    _apply_monthly_summary_formats(workbook)
     _apply_shop_daily_reg_thousand_sep(workbook)
     _handle_delay_chat_volume(workbook, summary)
     _handle_delay_kpi_fields(workbook)
