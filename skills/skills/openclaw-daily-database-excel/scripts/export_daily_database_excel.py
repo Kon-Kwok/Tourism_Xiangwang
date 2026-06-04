@@ -709,8 +709,11 @@ ALIMAMA_BUDGET_CHANNELS = [
 ]
 
 
-def build_alimama_budget_sheet(workbook, conn, database: str, biz_date: str, used_names: set[str]) -> None:
+def build_alimama_budget_sheet(workbook, conn, database: str, biz_date: str, start_date: str, end_date: str, used_names: set[str]) -> None:
     """Build 阿里妈妈预算明细 sheet with Budget/Act.Cost/IMP/Click per channel."""
+    from math import ceil
+    from datetime import datetime as dt_type, timedelta
+
     sheet_name = safe_sheet_name("阿里妈妈预算明细", used_names)
     ws = workbook.create_sheet(sheet_name)
 
@@ -731,55 +734,54 @@ def build_alimama_budget_sheet(workbook, conn, database: str, biz_date: str, use
     ws.merge_cells("A1:A2")
     ws.merge_cells("R1:R2")
 
-    # Fetch data
-    with conn.cursor() as cursor:
-        for _, table, cost_col, imp_col, click_col in ALIMAMA_BUDGET_CHANNELS:
-            cursor.execute(
-                f"SELECT date_time, `{cost_col}`, `{imp_col}`, `{click_col}` "
-                f"FROM `{database}`.`{table}` WHERE date_time = %s",
-                (biz_date,),
-            )
+    # Determine date range
+    if start_date and end_date:
+        dates = []
+        d = dt_type.strptime(start_date, "%Y-%m-%d").date()
+        end = dt_type.strptime(end_date, "%Y-%m-%d").date()
+        while d <= end:
+            dates.append(d.isoformat())
+            d += timedelta(days=1)
+    else:
+        dates = [biz_date]
 
-    # Single date: build one data row
-    from math import ceil
-    from datetime import datetime as dt_type
-    biz_dt = dt_type.strptime(biz_date, "%Y-%m-%d")
-
-    with conn.cursor() as cursor:
-        row_data = [biz_dt]
-        for _, table, cost_col, imp_col, click_col in ALIMAMA_BUDGET_CHANNELS:
-            cursor.execute(
-                f"SELECT `{cost_col}`, `{imp_col}`, `{click_col}` "
-                f"FROM `{database}`.`{table}` WHERE date_time = %s",
-                (biz_date,),
-            )
-            result = cursor.fetchone()
-            if result:
-                cost = _parse_alimama_number(result[0])
-                imp = int(_parse_alimama_number(result[1]))
-                click = int(_parse_alimama_number(result[2]))
-            else:
-                cost, imp, click = 0, 0, 0
-            # Budget: round up to nearest 500
-            budget = ceil(cost / 500) * 500 if cost > 0 else 0
-            row_data.extend([budget, cost, imp, click])
-        row_data.append("")
-        ws.append(row_data)
-
-    # Apply number formats
-    row_num = 3
+    # Build data rows
     date_fmt = "YYYY/MM/DD"
     budget_fmt = '_ \\¥ * #,##0_ ;_ \\¥ * \\-#,##0_ ;_ \\¥ * "-"??_ ;_ @_ '
     cost_fmt = '"￥"#,##0.00;"￥"\\-#,##0.00'
     imp_click_fmt = "#,##0"
 
-    ws.cell(row_num, 1).number_format = date_fmt
-    for ch_idx in range(4):
-        base = 2 + ch_idx * 4
-        ws.cell(row_num, base).number_format = budget_fmt      # Budget
-        ws.cell(row_num, base + 1).number_format = cost_fmt     # Act. Cost
-        ws.cell(row_num, base + 2).number_format = imp_click_fmt  # IMP
-        ws.cell(row_num, base + 3).number_format = imp_click_fmt  # Click
+    with conn.cursor() as cursor:
+        for d in dates:
+            d_dt = dt_type.strptime(d, "%Y-%m-%d")
+            row_data = [d_dt]
+            for _, table, cost_col, imp_col, click_col in ALIMAMA_BUDGET_CHANNELS:
+                cursor.execute(
+                    f"SELECT `{cost_col}`, `{imp_col}`, `{click_col}` "
+                    f"FROM `{database}`.`{table}` WHERE date_time = %s",
+                    (d,),
+                )
+                result = cursor.fetchone()
+                if result:
+                    cost = _parse_alimama_number(result[0])
+                    imp = int(_parse_alimama_number(result[1]))
+                    click = int(_parse_alimama_number(result[2]))
+                else:
+                    cost, imp, click = 0, 0, 0
+                budget = ceil(cost / 500) * 500 if cost > 0 else 0
+                row_data.extend([budget, cost, imp, click])
+            row_data.append("")
+            ws.append(row_data)
+
+            # Apply formats
+            row_num = ws.max_row
+            ws.cell(row_num, 1).number_format = date_fmt
+            for ch_idx in range(4):
+                base = 2 + ch_idx * 4
+                ws.cell(row_num, base).number_format = budget_fmt
+                ws.cell(row_num, base + 1).number_format = cost_fmt
+                ws.cell(row_num, base + 2).number_format = imp_click_fmt
+                ws.cell(row_num, base + 3).number_format = imp_click_fmt
 
     ws.freeze_panes = "A3"
 
@@ -955,7 +957,7 @@ def build_workbook(conn, args, biz_date: str, start_date: str = None, end_date: 
             summary.append((display_name, date_column, row_count))
 
     build_alimama_monthly_sheet(workbook, conn, args, biz_date or end_date, used_sheet_names)
-    build_alimama_budget_sheet(workbook, conn, args.database, biz_date or end_date, used_sheet_names)
+    build_alimama_budget_sheet(workbook, conn, args.database, biz_date, start_date, end_date, used_sheet_names)
 
     _apply_cell_formats(workbook)
     _apply_date_reformat(workbook)
