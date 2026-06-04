@@ -51,12 +51,14 @@ SHEET_COLUMN_EXCLUSIONS: dict[str, set[str]] = {
     "阿里妈妈-直通车": {"id", "collection_cart_cost", "collection_cart_count", "collection_cart_rate"},
     "阿里妈妈-引力魔方": {"id", "collection_cart_cost", "collection_cart_count", "collection_cart_rate"},
     "阿里妈妈-万相台": {"id", "bookmark_store", "collection_cart_cost", "collection_cart_count", "collection_cart_rate"},
+    "店铺日度关键数据": {"id", "super_recommendation_cost"},
 }
 
 SHEET_DATE_REFORMAT: dict[str, str] = {
     "赤兔-人均日接入": "日期",
     "赤兔-每周店铺个人数据": "date_time",
     "赤兔-客服数据23年新": "date_time",
+    "店铺日度关键数据": "日期",
     "店铺每日登记": "日期",
     "阿里妈妈-明星店铺": "date_time",
     "阿里妈妈-直通车": "date_time",
@@ -85,6 +87,10 @@ SHEET_CURRENCY_COLUMNS: dict[str, set[str]] = {
 
 SHEET_DECIMAL_FORMATS: dict[str, dict[str, str]] = {
     "阿里妈妈-明星店铺": {"roi": "0.00"},
+}
+
+SHEET_COL_RANGE_FORMATS: dict[str, list[tuple[int, int, str]]] = {
+    "店铺日度关键数据": [(26, 30, "0.00")],  # AA-AD columns (0-indexed 26-29)
 }
 
 
@@ -487,6 +493,24 @@ def _apply_shop_daily_reg_thousand_sep(workbook) -> None:
                     cell.number_format = '#,##0'
 
 
+def _apply_col_range_formats(workbook) -> None:
+    """Apply number format to specific column ranges per sheet."""
+    for worksheet in workbook.worksheets:
+        rules = SHEET_COL_RANGE_FORMATS.get(worksheet.title)
+        if not rules:
+            continue
+        for row in worksheet.iter_rows(min_row=2):
+            for start, end, fmt in rules:
+                for col_idx in range(start, min(end, len(row))):
+                    cell = row[col_idx]
+                    if cell.value is not None:
+                        try:
+                            cell.value = float(cell.value)
+                        except (ValueError, TypeError):
+                            pass
+                        cell.number_format = fmt
+
+
 def _apply_sheet_column_widths(workbook) -> None:
     """Override column widths for sheets with specific width rules."""
     for worksheet in workbook.worksheets:
@@ -699,6 +723,7 @@ def build_workbook(conn, args, biz_date: str, start_date: str = None, end_date: 
     _apply_cell_formats(workbook)
     _apply_date_reformat(workbook)
     _apply_currency_separator_formats(workbook)
+    _apply_col_range_formats(workbook)
     _apply_shop_daily_reg_thousand_sep(workbook)
     _handle_delay_chat_volume(workbook, summary)
     _handle_delay_kpi_fields(workbook)
