@@ -45,6 +45,48 @@ BODY_FONT_COLOR = "FF000000"
 BORDER_COLOR = "FFB7C3D0"
 DEFAULT_FONT = "等线"
 
+SHEET_COLUMN_EXCLUSIONS: dict[str, set[str]] = {
+    "店铺每日登记": {"id"},
+    "阿里妈妈-明星店铺": {"id", "cart_rate"},
+    "阿里妈妈-直通车": {"id", "collection_cart_cost", "collection_cart_count", "collection_cart_rate"},
+    "阿里妈妈-引力魔方": {"id", "collection_cart_cost", "collection_cart_count", "collection_cart_rate"},
+    "阿里妈妈-万相台": {"id", "bookmark_store", "collection_cart_cost", "collection_cart_count", "collection_cart_rate"},
+}
+
+SHEET_DATE_REFORMAT: dict[str, str] = {
+    "赤兔-人均日接入": "日期",
+    "赤兔-每周店铺个人数据": "date_time",
+    "赤兔-客服数据23年新": "date_time",
+    "店铺每日登记": "日期",
+    "阿里妈妈-明星店铺": "date_time",
+    "阿里妈妈-直通车": "date_time",
+    "阿里妈妈-引力魔方": "date_time",
+    "阿里妈妈-万相台": "date_time",
+}
+
+SHEET_DATE_TO_END: set[str] = {
+    "赤兔-每周店铺个人数据",
+    "赤兔-客服数据23年新",
+}
+
+SHEET_COLUMN_WIDTHS: dict[str, dict[str, float]] = {
+    "赤兔-人均日接入": {
+        "询单最终付款成功率": 27.52,
+        "__default__": 13.42,
+    },
+}
+
+SHEET_CURRENCY_COLUMNS: dict[str, set[str]] = {
+    "阿里妈妈-明星店铺": {"cost", "cpc"},
+    "阿里妈妈-直通车": {"cost", "cpc"},
+    "阿里妈妈-引力魔方": {"cost", "cpm", "roi"},
+    "阿里妈妈-万相台": {"cost"},
+}
+
+SHEET_DECIMAL_FORMATS: dict[str, dict[str, str]] = {
+    "阿里妈妈-明星店铺": {"roi": "0.00"},
+}
+
 
 def load_env() -> None:
     env_path = PROJECT_ROOT / ".env"
@@ -118,40 +160,50 @@ def all_date_tables(cursor, database: str) -> list[tuple[str, str, str]]:
     return tables
 
 
-def _clean_columns_rows(columns, rows, date_column):
-    keep_idx = [i for i, col in enumerate(columns) if col not in EXCLUDE_COLUMNS]
+def _clean_columns_rows(columns, rows, date_column, sheet_name=None):
+    extra_exclude = SHEET_COLUMN_EXCLUSIONS.get(sheet_name, set())
+    keep_idx = [i for i, col in enumerate(columns) if col not in EXCLUDE_COLUMNS and col not in extra_exclude]
     columns = [columns[i] for i in keep_idx]
     rows = [tuple(row[i] for i in keep_idx) for row in rows]
+    move_date_to_end = sheet_name in SHEET_DATE_TO_END
     new_order = []
     for head in ("id", date_column):
-        try:
-            idx = columns.index(head)
-            new_order.append(idx)
-        except ValueError:
-            pass
+        if not move_date_to_end or head != date_column:
+            try:
+                idx = columns.index(head)
+                new_order.append(idx)
+            except ValueError:
+                pass
     for i in range(len(columns)):
         if i not in new_order:
             new_order.append(i)
+    if move_date_to_end:
+        try:
+            idx = columns.index(date_column)
+            new_order.remove(idx)
+            new_order.append(idx)
+        except ValueError:
+            pass
     columns = [columns[i] for i in new_order]
     rows = [tuple(row[i] for i in new_order) for row in rows]
     return columns, rows
 
 
-def fetch_table(cursor, database: str, table_name: str, date_column: str, biz_date: str):
+def fetch_table(cursor, database: str, table_name: str, date_column: str, biz_date: str, sheet_name=None):
     cursor.execute(f"SELECT * FROM `{database}`.`{table_name}` WHERE `{date_column}` = %s", (biz_date,))
     columns = [column[0] for column in cursor.description]
     rows = cursor.fetchall()
-    return _clean_columns_rows(columns, rows, date_column)
+    return _clean_columns_rows(columns, rows, date_column, sheet_name)
 
 
-def fetch_table_range(cursor, database: str, table_name: str, date_column: str, start_date: str, end_date: str):
+def fetch_table_range(cursor, database: str, table_name: str, date_column: str, start_date: str, end_date: str, sheet_name=None):
     cursor.execute(
         f"SELECT * FROM `{database}`.`{table_name}` WHERE `{date_column}` BETWEEN %s AND %s ORDER BY `{date_column}`, `id`",
         (start_date, end_date),
     )
     columns = [column[0] for column in cursor.description]
     rows = cursor.fetchall()
-    return _clean_columns_rows(columns, rows, date_column)
+    return _clean_columns_rows(columns, rows, date_column, sheet_name)
 
 
 def safe_sheet_name(name: str, used: set[str]) -> str:
@@ -353,6 +405,105 @@ def _handle_delay_kpi_fields(workbook) -> None:
                     cell.number_format = "@"
 
 
+def _apply_date_reformat(workbook) -> None:
+    """Convert date columns from yyyy-mm-dd to yyyy/mm/dd format."""
+    from datetime import datetime as dt_type
+    for worksheet in workbook.worksheets:
+        date_col_name = SHEET_DATE_REFORMAT.get(worksheet.title)
+        if not date_col_name:
+            continue
+        header_row = worksheet[1]
+        col_idx = None
+        for idx, cell in enumerate(header_row):
+            if cell.value == date_col_name:
+                col_idx = idx
+                break
+        if col_idx is None:
+            continue
+        for row in worksheet.iter_rows(min_row=2):
+            cell = row[col_idx]
+            if cell.value is not None:
+                if isinstance(cell.value, (date, dt_type)):
+                    cell.number_format = "YYYY/MM/DD"
+                elif isinstance(cell.value, str):
+                    for fmt in ("%Y-%m-%d", "%Y/%m/%d"):
+                        try:
+                            parsed = dt_type.strptime(cell.value, fmt)
+                            cell.value = parsed
+                            cell.number_format = "YYYY/MM/DD"
+                            break
+                        except ValueError:
+                            continue
+
+
+def _apply_currency_separator_formats(workbook) -> None:
+    """Apply currency format and thousand separator to designated columns."""
+    for worksheet in workbook.worksheets:
+        name = worksheet.title
+        currency_cols = SHEET_CURRENCY_COLUMNS.get(name, set())
+        decimal_fmts = SHEET_DECIMAL_FORMATS.get(name, {})
+        if not currency_cols and not decimal_fmts:
+            continue
+        header_row = worksheet[1]
+        col_map: dict[str, int] = {}
+        for idx, cell in enumerate(header_row):
+            col_map[cell.value] = idx
+
+        for row in worksheet.iter_rows(min_row=2):
+            for col_name in currency_cols:
+                if col_name not in col_map:
+                    continue
+                cell = row[col_map[col_name]]
+                if cell.value is not None:
+                    val = cell.value
+                    if isinstance(val, (int, float)):
+                        cell.number_format = '￥#,##0.00'
+                    elif isinstance(val, str):
+                        try:
+                            cleaned = val.replace(",", "").replace("，", "").replace("￥", "").replace("¥", "").strip()
+                            cell.value = float(cleaned)
+                            cell.number_format = '￥#,##0.00'
+                        except (ValueError, TypeError):
+                            pass
+            for col_name, fmt in decimal_fmts.items():
+                if col_name not in col_map:
+                    continue
+                cell = row[col_map[col_name]]
+                if cell.value is not None:
+                    cell.number_format = fmt
+
+
+def _apply_shop_daily_reg_thousand_sep(workbook) -> None:
+    """Apply thousand separator to B-G columns of 店铺每日登记."""
+    for worksheet in workbook.worksheets:
+        if worksheet.title != "店铺每日登记":
+            continue
+        for row in worksheet.iter_rows(min_row=2):
+            for col_idx in range(1, 7):
+                if col_idx >= len(row):
+                    continue
+                cell = row[col_idx]
+                if cell.value is not None and isinstance(cell.value, (int, float)):
+                    cell.number_format = '#,##0'
+
+
+def _apply_sheet_column_widths(workbook) -> None:
+    """Override column widths for sheets with specific width rules."""
+    for worksheet in workbook.worksheets:
+        rules = SHEET_COLUMN_WIDTHS.get(worksheet.title)
+        if not rules:
+            continue
+        default_width = rules.get("__default__")
+        header_row = worksheet[1]
+        for idx, cell in enumerate(header_row):
+            col_letter = worksheet.cell(1, idx + 1).column_letter
+            col_name = cell.value
+            if col_name in rules:
+                worksheet.column_dimensions[col_letter].width = rules[col_name]
+            elif default_width is not None:
+                worksheet.column_dimensions[col_letter].width = default_width
+
+
 def _monthly_period_for_date(ref_date: date) -> tuple[date, date, str]:
     if ref_date.month == 1 and ref_date.day <= 20:
         start, end, label = date(ref_date.year, 1, 1), date(ref_date.year, 1, 20), f"{ref_date.year}年1月"
@@ -435,12 +586,9 @@ def build_alimama_monthly_sheet(workbook, conn, args, biz_date_str: str, used_na
 
     headers = [
         "", "花费", "展示", "点击", "订单", "销量",
-        "加入购物车", "宝贝收藏", "店铺收藏", "总收藏数",
+        "加入购物车", "宝贝收藏", "店铺收藏",
         "CTR", "CPC", "CPM", "ROI", "CVR",
-        "ASP", "订单成本", "加购成本", "收藏加购数",
-        "收藏加购环比", "花费占比", "花费环比",
-        "点击占比", "加购环比", "成交环比",
-        "加购成本环比", "收藏加购成本环比", "费率",
+        "ASP", "订单成本", "加购成本",
     ]
     ws.append(headers)
 
@@ -458,12 +606,9 @@ def build_alimama_monthly_sheet(workbook, conn, args, biz_date_str: str, used_na
             cart = d.get("shopping_cart", 0)
             bp = d.get("bookmark_product", 0)
             bs = d.get("bookmark_store", 0)
-            bm_total = d.get("bookmark_total", 0)
-            collection_total = cart + bm_total
-
             ws.append([
                 channel, cost, imp, click, order, sales,
-                cart, bp, bs, bm_total,
+                cart, bp, bs,
                 f"=D{row_num}/C{row_num}",          # CTR
                 f"=B{row_num}/D{row_num}",          # CPC
                 f"=(B{row_num}/C{row_num})*1000",    # CPM
@@ -472,67 +617,26 @@ def build_alimama_monthly_sheet(workbook, conn, args, biz_date_str: str, used_na
                 f"=IF(E{row_num}=0,0,F{row_num}/E{row_num})",  # ASP
                 f"=IF(E{row_num}=0,0,B{row_num}/E{row_num})",  # 订单成本
                 f"=B{row_num}/G{row_num}",          # 加购成本
-                f"=G{row_num}+J{row_num}",          # 收藏加购数
-            ] + ([
-                "",                                  # 环比 (filled if prev_data)
-                "",                                  # 花费占比 (filled below)
-                "",                                  # 花费环比
-                "",                                  # 点击占比
-                "",                                  # 加购环比
-                "",                                  # 成交环比
-                "",                                  # 加购成本环比
-                "",                                  # 收藏加购成本环比
-                "",                                  # 费率
-            ]))
+            ])
 
         total_row = ws.max_row + 1
-        ws.append(["总计"] + [f"=SUM({chr(65+c)}{block_start}:{chr(65+c)}{total_row-1})" for c in range(1, 10)] + [""] * (len(headers) - 10))
-        for col_idx in range(11, 20):
-            letter = openpyxl.utils.get_column_letter(col_idx)
-            ws.cell(total_row, col_idx).value = f"={letter}{total_row - 1}"
-        # Total row has some different formulas
-        # Re-derive total row formulas from totals
-        ws.cell(total_row, 11).value = f"=D{total_row}/C{total_row}"  # CTR
-        ws.cell(total_row, 12).value = f"=B{total_row}/D{total_row}"  # CPC
-        ws.cell(total_row, 13).value = f"=(B{total_row}/C{total_row})*1000"  # CPM
-        ws.cell(total_row, 14).value = f"=F{total_row}/B{total_row}"  # ROI
-        ws.cell(total_row, 15).value = f"=E{total_row}/D{total_row}"  # CVR
-        ws.cell(total_row, 16).value = f"=IF(E{total_row}=0,0,F{total_row}/E{total_row})"  # ASP
-        ws.cell(total_row, 17).value = f"=IF(E{total_row}=0,0,B{total_row}/E{total_row})"  # 订单成本
-        ws.cell(total_row, 18).value = f"=B{total_row}/G{total_row}"  # 加购成本
-        ws.cell(total_row, 19).value = f"=G{total_row}+J{total_row}"  # 收藏加购数
-        ws.cell(total_row, 21).value = f"=B{total_row}/B{total_row}"  # 花费占比 (total = 100%)
-        ws.cell(total_row, 29).value = f"=B{total_row}/F{total_row}"  # 费率
+        ws.append(["总计"] + [f"=SUM({chr(65+c)}{block_start}:{chr(65+c)}{total_row-1})" for c in range(1, 9)] + [""] * 8)
+        ws.cell(total_row, 10).value = f"=D{total_row}/C{total_row}"  # CTR
+        ws.cell(total_row, 11).value = f"=B{total_row}/D{total_row}"  # CPC
+        ws.cell(total_row, 12).value = f"=(B{total_row}/C{total_row})*1000"  # CPM
+        ws.cell(total_row, 13).value = f"=F{total_row}/B{total_row}"  # ROI
+        ws.cell(total_row, 14).value = f"=E{total_row}/D{total_row}"  # CVR
+        ws.cell(total_row, 15).value = f"=IF(E{total_row}=0,0,F{total_row}/E{total_row})"  # ASP
+        ws.cell(total_row, 16).value = f"=IF(E{total_row}=0,0,B{total_row}/E{total_row})"  # 订单成本
+        ws.cell(total_row, 17).value = f"=B{total_row}/G{total_row}"  # 加购成本
 
         return block_start, total_row
 
-    current_start, current_total = write_period_block(period_label, current_data)
-    prev_start, prev_total = write_period_block(f"{prev_start.month}月{prev_start.day}号-{prev_end.month}月{prev_end.day}号", previous_data)
-
-    # Now fill in 环比 and 占比 formulas for current period rows
-    for offset, channel in enumerate(ALIMAMA_CHANNELS):
-        curr_row = current_start + offset
-        prev_row = prev_start + offset
-        current_total_row = current_total
-        # 收藏加购环比 (col 20 = T)
-        ws.cell(curr_row, 20).value = f'=IF(S{prev_row}=0,"",(S{curr_row}-S{prev_row})/S{prev_row})'
-        # 花费占比 (col 21 = U)
-        ws.cell(curr_row, 21).value = f"=B{curr_row}/$B${current_total_row}"
-        # 花费环比 (col 22 = V)
-        ws.cell(curr_row, 22).value = f'=IF(B{prev_row}=0,"",(B{curr_row}-B{prev_row})/B{prev_row})'
-        # 点击占比 (col 23 = W)
-        ws.cell(curr_row, 23).value = f"=D{curr_row}/$D${current_total_row}"
-        # 加购环比 (col 24 = X)
-        ws.cell(curr_row, 24).value = f'=IF(G{prev_row}=0,"",(G{curr_row}-G{prev_row})/G{prev_row})'
-        # 成交环比 (col 25 = Y)
-        ws.cell(curr_row, 25).value = f'=IF(F{prev_row}=0,"",(F{curr_row}-F{prev_row})/F{prev_row})'
-        # 加购成本环比 (col 26 = Z)
-        ws.cell(curr_row, 26).value = f'=IF(R{prev_row}=0,"",(R{curr_row}-R{prev_row})/R{prev_row})'
-        # 收藏加购成本环比 (col 27 = AA)
-        ws.cell(curr_row, 27).value = f'=IF(U{prev_row}=0,"",(U{curr_row}-U{prev_row})/U{prev_row})'
+    write_period_block(period_label, current_data)
+    _, prev_total = write_period_block(f"{prev_start.month}月{prev_start.day}号-{prev_end.month}月{prev_end.day}号", previous_data)
 
     # Hide the previous period rows
-    for row in range(prev_start - 1, prev_total + 1):
+    for row in range(prev_total - len(ALIMAMA_CHANNELS) - 1, prev_total + 1):
         ws.row_dimensions[row].hidden = True
 
     ws.freeze_panes = "B3"
@@ -559,18 +663,17 @@ def apply_standard_table_style(workbook) -> None:
     thin_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
 
     for worksheet in workbook.worksheets:
-        header_row_idx = 3 if worksheet.title == "汇总" else 1
         for row in worksheet.iter_rows():
             for cell in row:
                 cell.border = thin_border
                 cell.alignment = alignment
                 cell.font = body_font
-        if worksheet.max_row >= header_row_idx:
-            for cell in worksheet[header_row_idx]:
+        if worksheet.max_row >= 1:
+            for cell in worksheet[1]:
                 cell.fill = header_fill
                 cell.font = header_font
                 cell.alignment = header_alignment
-            worksheet.row_dimensions[header_row_idx].height = 41.4
+            worksheet.row_dimensions[1].height = 41.4
 
 
 def build_workbook(conn, args, biz_date: str, start_date: str = None, end_date: str = None):
@@ -585,28 +688,22 @@ def build_workbook(conn, args, biz_date: str, start_date: str = None, end_date: 
 
         for table_name, date_column, display_name in tables:
             if range_mode:
-                columns, rows = fetch_table_range(cursor, args.database, table_name, date_column, start_date, end_date)
+                columns, rows = fetch_table_range(cursor, args.database, table_name, date_column, start_date, end_date, display_name)
             else:
-                columns, rows = fetch_table(cursor, args.database, table_name, date_column, biz_date)
+                columns, rows = fetch_table(cursor, args.database, table_name, date_column, biz_date, display_name)
             row_count = write_sheet(workbook, display_name, columns, rows, used_sheet_names)
             summary.append((display_name, date_column, row_count))
 
     build_alimama_monthly_sheet(workbook, conn, args, biz_date or end_date, used_sheet_names)
 
-    overview = workbook.create_sheet("汇总", 0)
-    if range_mode:
-        overview.append(["日期范围", f"{start_date} 至 {end_date}", "", ""])
-    else:
-        overview.append(["日期", biz_date])
-    overview.append([])
-    overview.append(["表名", "日期字段", "行数"])
-    for row in summary:
-        overview.append(list(row))
-    overview.freeze_panes = "A4"
     _apply_cell_formats(workbook)
+    _apply_date_reformat(workbook)
+    _apply_currency_separator_formats(workbook)
+    _apply_shop_daily_reg_thousand_sep(workbook)
     _handle_delay_chat_volume(workbook, summary)
     _handle_delay_kpi_fields(workbook)
     autosize_workbook(workbook)
+    _apply_sheet_column_widths(workbook)
     apply_standard_table_style(workbook)
     return workbook, summary
 
