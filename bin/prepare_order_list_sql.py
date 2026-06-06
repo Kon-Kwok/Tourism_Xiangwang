@@ -82,6 +82,8 @@ DELETE FROM {TARGET_TABLE} WHERE order_date = '{biz_date}';
 -- 没有订单明细需要入库
 """
 
+    joined_values = ",\n".join(values)
+
     return f"""
 -- 飞猪订单数据
 -- 日期: {biz_date}
@@ -109,7 +111,7 @@ DELETE FROM {TARGET_TABLE} WHERE order_date = '{biz_date}';
 INSERT INTO {TARGET_TABLE}
 (order_id, item_title, package_type, buy_mount, actual_fee, order_time, status_text, order_date)
 VALUES
-{',\n'.join(values)};
+{joined_values};
 """
 
 def main():

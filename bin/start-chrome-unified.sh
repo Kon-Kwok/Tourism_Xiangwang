@@ -12,6 +12,53 @@ REFRESH_INITIAL_DELAY="${CHROME_REFRESH_INITIAL_DELAY_SECONDS:-1800}"
 REFRESH_LOG="${CHROME_REFRESH_LOG:-/tmp/chrome_refresh.log}"
 REFRESH_PID_FILE="${CHROME_REFRESH_PID_FILE:-/tmp/chrome_refresh_${DEBUG_PORT}.pid}"
 REFRESH_DOMAINS="${CHROME_REFRESH_DOMAINS:-sycm.taobao.com,fsc.fliggy.com,kf.topchitu.com,brandsearch.taobao.com,branding.taobao.com,one.alimama.com}"
+CHROME_VERIFY_STABLE_DELAY_SECONDS="${CHROME_VERIFY_STABLE_DELAY_SECONDS:-2}"
+
+find_chrome_binary() {
+    if [ -n "${CHROME_BIN:-}" ]; then
+        if [ -x "$CHROME_BIN" ]; then
+            echo "$CHROME_BIN"
+            return 0
+        fi
+        echo "指定的 CHROME_BIN 不可执行: $CHROME_BIN" >&2
+        return 1
+    fi
+
+    case "$(uname -s)" in
+        Darwin)
+            local mac_candidates=(
+                "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+                "$HOME/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+                "/Applications/Google Chrome Beta.app/Contents/MacOS/Google Chrome Beta"
+            )
+            local candidate
+            for candidate in "${mac_candidates[@]}"; do
+                if [ -x "$candidate" ]; then
+                    echo "$candidate"
+                    return 0
+                fi
+            done
+            ;;
+        Linux)
+            local linux_candidates=(
+                "google-chrome"
+                "google-chrome-stable"
+                "chromium"
+                "chromium-browser"
+            )
+            local candidate
+            for candidate in "${linux_candidates[@]}"; do
+                if command -v "$candidate" > /dev/null 2>&1; then
+                    command -v "$candidate"
+                    return 0
+                fi
+            done
+            ;;
+    esac
+
+    echo "未找到 Chrome 可执行文件。可通过 CHROME_BIN=/path/to/chrome 指定。" >&2
+    return 1
+}
 
 stop_refresh_daemon() {
     local refresh_pid=""
@@ -23,6 +70,24 @@ stop_refresh_daemon() {
         fi
     fi
     rm -f "$REFRESH_PID_FILE"
+}
+
+stop_debug_chrome() {
+    local stopped=0
+    if pgrep -f "remote-debugging-port=$DEBUG_PORT" > /dev/null 2>&1; then
+        pkill -9 -f "remote-debugging-port=$DEBUG_PORT" || true
+        stopped=1
+    fi
+    if pgrep -f "$CONFIG_DIR" > /dev/null 2>&1; then
+        pkill -9 -f "$CONFIG_DIR" || true
+        stopped=1
+    fi
+
+    if [ "$stopped" = "1" ]; then
+        sleep 2
+    fi
+
+    rm -f "$CONFIG_DIR/SingletonLock" "$CONFIG_DIR/SingletonSocket" "$CONFIG_DIR/SingletonCookie"
 }
 
 start_refresh_daemon() {
@@ -86,11 +151,8 @@ echo ""
 # 1. 关闭旧的调试Chrome
 echo "步骤 1/4: 清理..."
 stop_refresh_daemon
-if pgrep -f "chrome.*--remote-debugging-port=$DEBUG_PORT" > /dev/null 2>&1; then
-    echo "正在关闭旧Chrome..."
-    pkill -9 -f "chrome.*--remote-debugging-port=$DEBUG_PORT" || true
-    sleep 2
-fi
+echo "正在关闭旧Chrome..."
+stop_debug_chrome
 echo "✓ 清理完成"
 echo ""
 
@@ -102,21 +164,42 @@ echo ""
 
 # 3. 启动Chrome
 echo "步骤 3/4: 启动Chrome..."
-# WSLg 的 XWayland 光标渲染在近期的 WSLg 更新后可能出现不可见问题
-# --ozone-platform=wayland: 绕过 XWayland，直接使用 Wayland 协议，光标由 Weston 直接管理
-nohup google-chrome \
-  --remote-debugging-port=$DEBUG_PORT \
-  --user-data-dir="$CONFIG_DIR" \
-  --no-first-run \
-  --no-default-browser-check \
-  --disable-gpu \
-  --disable-gpu-sandbox \
-  --ozone-platform=wayland \
-  "${START_URLS[@]}" \
-  > /tmp/chrome_debug.log 2>&1 &
+CHROME_BIN_FROM_ENV="${CHROME_BIN:-}"
+CHROME_BIN="$(find_chrome_binary)"
+echo "✓ Chrome路径: $CHROME_BIN"
+
+CHROME_ARGS=(
+  "--remote-debugging-port=$DEBUG_PORT"
+  "--user-data-dir=$CONFIG_DIR"
+  "--no-first-run"
+  "--no-default-browser-check"
+)
+
+if [ "$(uname -s)" = "Linux" ]; then
+    # WSLg 的 XWayland 光标渲染在近期的 WSLg 更新后可能出现不可见问题
+    # --ozone-platform=wayland: 绕过 XWayland，直接使用 Wayland 协议，光标由 Weston 直接管理
+    CHROME_ARGS+=(
+      "--disable-gpu"
+      "--disable-gpu-sandbox"
+      "--ozone-platform=wayland"
+    )
+fi
+
+if [ "$(uname -s)" = "Darwin" ] && [ -z "$CHROME_BIN_FROM_ENV" ] && command -v open > /dev/null 2>&1; then
+  nohup open -n -a "Google Chrome" \
+    --args \
+    "${CHROME_ARGS[@]}" \
+    "${START_URLS[@]}" \
+    > /tmp/chrome_debug.log 2>&1 &
+else
+  nohup "$CHROME_BIN" \
+    "${CHROME_ARGS[@]}" \
+    "${START_URLS[@]}" \
+    > /tmp/chrome_debug.log 2>&1 &
+fi
 
 CHROME_PID=$!
-echo "✓ Chrome PID: $CHROME_PID"
+echo "✓ Chrome启动器 PID: $CHROME_PID"
 echo ""
 
 # 4. 等待并验证
@@ -126,6 +209,12 @@ sleep 6
 # 等待Chrome启动并创建配置
 for i in {1..15}; do
     if curl -s http://localhost:$DEBUG_PORT/json/version > /dev/null 2>&1; then
+        sleep "$CHROME_VERIFY_STABLE_DELAY_SECONDS"
+        if ! curl -s http://localhost:$DEBUG_PORT/json/version > /dev/null 2>&1; then
+            echo "等待中... ($i/15)"
+            sleep 2
+            continue
+        fi
 # 创建DevToolsActivePort文件
         mkdir -p "$CONFIG_DIR/Default"
         # 获取浏览器WebSocket URL
@@ -156,7 +245,7 @@ for i in {1..15}; do
         echo "管理Chrome："
         echo "  查看日志: tail -f /tmp/chrome_debug.log"
         echo "  查看刷新日志: tail -f $REFRESH_LOG"
-        echo "  停止Chrome: pkill -f 'chrome.*remote-debugging-port=$DEBUG_PORT'"
+        echo "  停止Chrome: pkill -f 'remote-debugging-port=$DEBUG_PORT'"
         echo "  停止自动刷新: kill \$(cat $REFRESH_PID_FILE)"
         echo "  重启Chrome: ./bin/start-chrome-unified.sh"
         echo ""
@@ -172,5 +261,5 @@ echo "请检查："
 echo "  1. 查看日志: cat /tmp/chrome_debug.log"
 echo "  2. 检查进程: ps aux | grep chrome"
 
-pkill -9 -f "chrome.*--remote-debugging-port=$DEBUG_PORT" || true
+stop_debug_chrome
 exit 1
