@@ -5,20 +5,6 @@
 CREATE DATABASE IF NOT EXISTS `Xiangwang` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `Xiangwang`;
 
-DROP TABLE IF EXISTS `collection_batches`;
-CREATE TABLE `collection_batches` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '批次ID',
-  `page_code` varchar(64) NOT NULL COMMENT '页面编码',
-  `biz_date` date NOT NULL COMMENT '业务日期',
-  `shop_name` varchar(255) NOT NULL COMMENT '店铺名称',
-  `status` varchar(32) NOT NULL COMMENT '批次状态',
-  `started_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '开始时间',
-  `finished_at` timestamp NULL DEFAULT NULL COMMENT '结束时间',
-  `error_message` text COMMENT '错误信息',
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='生意参谋采集批次';
-
-DROP TABLE IF EXISTS `customer_service_data_daily`;
 CREATE TABLE `customer_service_data_daily` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `日期` date NOT NULL COMMENT '日期',
@@ -41,30 +27,6 @@ CREATE TABLE `customer_service_data_daily` (
   KEY `idx_旺旺` (`旺旺`)
 ) ENGINE=InnoDB AUTO_INCREMENT=781 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='飞猪客服数据汇总日数据';
 
-DROP TABLE IF EXISTS `customer_service_data_weekly`;
-CREATE TABLE `customer_service_data_weekly` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `日期` varchar(20) DEFAULT NULL COMMENT '日期(周范围)',
-  `旺旺` varchar(100) DEFAULT NULL COMMENT '旺旺',
-  `接待人数` int DEFAULT NULL COMMENT '接待人数',
-  `平均响应秒` decimal(8,2) DEFAULT NULL COMMENT '平均响应(秒)',
-  `回复率` tinyint DEFAULT NULL COMMENT '回复率',
-  `询单最终付款成功率` tinyint DEFAULT NULL COMMENT '询单->最终付款成功率',
-  `上班天数` decimal(4,1) DEFAULT NULL COMMENT '上班天数',
-  `评价发送率` decimal(10,4) DEFAULT NULL COMMENT '评价发送率',
-  `客户满意比` tinyint DEFAULT NULL COMMENT '客户满意比',
-  `很满意` int DEFAULT NULL COMMENT '很满意',
-  `满意` int DEFAULT NULL COMMENT '满意',
-  `一般` int DEFAULT NULL COMMENT '一般',
-  `不满意` int DEFAULT NULL COMMENT '不满意',
-  `很不满意` int DEFAULT NULL COMMENT '很不满意',
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `idx_日期` (`日期`),
-  KEY `idx_旺旺` (`旺旺`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='飞猪客服数据汇总周数据';
-
-DROP TABLE IF EXISTS `customer_service_performance_summary`;
 CREATE TABLE `customer_service_performance_summary` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `旺旺昵称` varchar(100) DEFAULT NULL COMMENT '旺旺昵称',
@@ -82,7 +44,7 @@ CREATE TABLE `customer_service_performance_summary` (
   KEY `idx_date_time` (`date_time`)
 ) ENGINE=InnoDB AUTO_INCREMENT=769 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='飞猪客服绩效汇总';
 
-DROP TABLE IF EXISTS `customer_service_performance_workload_analysis`;
+
 CREATE TABLE `customer_service_performance_workload_analysis` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `旺旺昵称` varchar(100) DEFAULT NULL COMMENT '旺旺昵称',
@@ -112,7 +74,7 @@ CREATE TABLE `customer_service_performance_workload_analysis` (
   KEY `idx_date_time` (`date_time`)
 ) ENGINE=InnoDB AUTO_INCREMENT=769 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='飞猪客服绩效工作量分析';
 
-DROP TABLE IF EXISTS `gravity_rubiks_cube`;
+
 CREATE TABLE `gravity_rubiks_cube` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `date_time` date NOT NULL COMMENT 'Date 时间',
@@ -137,37 +99,6 @@ CREATE TABLE `gravity_rubiks_cube` (
   KEY `idx_date_time` (`date_time`)
 ) ENGINE=InnoDB AUTO_INCREMENT=36 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='飞猪引力魔方';
 
-DROP TABLE IF EXISTS `homepage_metrics`;
-CREATE TABLE `homepage_metrics` (
-  `biz_date` date NOT NULL COMMENT '业务日期',
-  `page_code` varchar(64) NOT NULL COMMENT '页面编码',
-  `shop_name` varchar(255) NOT NULL COMMENT '店铺名称',
-  `metric_code` varchar(128) NOT NULL COMMENT '指标编码',
-  `metric_value` decimal(20,6) DEFAULT NULL COMMENT '指标值',
-  `cycle_crc` decimal(20,10) DEFAULT NULL COMMENT '环比',
-  `sync_crc` decimal(20,10) DEFAULT NULL COMMENT '同比/对比',
-  `year_sync_crc` decimal(20,10) DEFAULT NULL COMMENT '去年同期',
-  `collected_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '采集时间',
-  `batch_id` bigint NOT NULL COMMENT '批次ID',
-  PRIMARY KEY (`biz_date`,`page_code`,`metric_code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='生意参谋首页核心指标';
-
-DROP TABLE IF EXISTS `homepage_trends`;
-CREATE TABLE `homepage_trends` (
-  `biz_date` date NOT NULL COMMENT '业务日期',
-  `stat_date` date NOT NULL COMMENT '统计日期',
-  `page_code` varchar(64) NOT NULL COMMENT '页面编码',
-  `shop_name` varchar(255) NOT NULL COMMENT '店铺名称',
-  `metric_code` varchar(128) NOT NULL COMMENT '指标编码',
-  `self_value` decimal(20,6) DEFAULT NULL COMMENT '本店值',
-  `rival_avg_value` decimal(20,6) DEFAULT NULL COMMENT '同行同层均值',
-  `rival_good_value` decimal(20,6) DEFAULT NULL COMMENT '同行优秀值',
-  `collected_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '采集时间',
-  `batch_id` bigint NOT NULL COMMENT '批次ID',
-  PRIMARY KEY (`biz_date`,`stat_date`,`page_code`,`metric_code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='生意参谋首页趋势序列';
-
-DROP TABLE IF EXISTS `order_list`;
 CREATE TABLE `order_list` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `order_id` varchar(50) NOT NULL,
@@ -183,9 +114,9 @@ CREATE TABLE `order_list` (
   PRIMARY KEY (`id`),
   KEY `idx_order_date` (`order_date`),
   KEY `idx_order_id` (`order_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='订单数据';
 
-DROP TABLE IF EXISTS `shop_daily_key_data`;
+
 CREATE TABLE `shop_daily_key_data` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `日期` date NOT NULL COMMENT '日期',
@@ -224,7 +155,7 @@ CREATE TABLE `shop_daily_key_data` (
   KEY `idx_日期` (`日期`)
 ) ENGINE=InnoDB AUTO_INCREMENT=36 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='千牛飞猪店铺日度关键数据';
 
-DROP TABLE IF EXISTS `shop_data_daily_registration`;
+
 CREATE TABLE `shop_data_daily_registration` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `日期` date NOT NULL COMMENT '日期',
@@ -242,7 +173,7 @@ CREATE TABLE `shop_data_daily_registration` (
   KEY `idx_日期` (`日期`)
 ) ENGINE=InnoDB AUTO_INCREMENT=53 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='千牛店铺数据每日登记';
 
-DROP TABLE IF EXISTS `star_store`;
+
 CREATE TABLE `star_store` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `date_time` date NOT NULL COMMENT 'Date 时间',
@@ -268,7 +199,7 @@ CREATE TABLE `star_store` (
   KEY `idx_date_time` (`date_time`)
 ) ENGINE=InnoDB AUTO_INCREMENT=36 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='飞猪明星店铺';
 
-DROP TABLE IF EXISTS `tmall_express`;
+
 CREATE TABLE `tmall_express` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `date_time` date NOT NULL COMMENT 'Date 时间',
@@ -295,7 +226,7 @@ CREATE TABLE `tmall_express` (
   KEY `idx_date_time` (`date_time`)
 ) ENGINE=InnoDB AUTO_INCREMENT=36 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='飞猪直通车';
 
-DROP TABLE IF EXISTS `wanxiangtai`;
+
 CREATE TABLE `wanxiangtai` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `date_time` date NOT NULL COMMENT 'Date 时间',
@@ -320,7 +251,7 @@ CREATE TABLE `wanxiangtai` (
   KEY `idx_date_time` (`date_time`)
 ) ENGINE=InnoDB AUTO_INCREMENT=36 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='万相台';
 
-DROP TABLE IF EXISTS `wanxiangtai_2`;
+
 CREATE TABLE `wanxiangtai_2` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `date_time` date NOT NULL COMMENT '日期',
