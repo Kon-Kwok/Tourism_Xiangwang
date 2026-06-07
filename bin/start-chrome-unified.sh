@@ -138,8 +138,9 @@ else
         "https://sycm.taobao.com/portal/home.htm"
         "https://fsc.fliggy.com/#/new/home"
         "https://kf.topchitu.com/web/custom-kpi/employee-kpi?id=1721&wwt=ALL"
-        "https://one.alimama.com/index.html"
-        "https://branding.taobao.com/index.action"
+        # 阿里妈妈投放采集当前停用，恢复时再打开以下登录页。
+        # "https://one.alimama.com/index.html"
+        # "https://branding.taobao.com/index.action"
     )
 fi
 
