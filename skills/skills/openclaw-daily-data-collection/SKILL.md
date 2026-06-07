@@ -1,11 +1,11 @@
 ---
 name: openclaw-daily-data-collection
-description: OpenClaw 侧调用飞猪业务四大日报采集。一键采集赤兔 KPI 客服报表、飞猪订单列表、SYCM 流量看板、阿里妈妈投放日报；当用户需要"日报数据""昨日日报""采集 x 日数据"或提及 KPI、订单、流量、阿里妈妈、直通车、万相台时使用。
+description: OpenClaw 侧采集并补齐 Xiangwang 店铺每日登记数据；当前保留赤兔 KPI、飞猪订单、SYCM 流量作为必要数据源，阿里妈妈投放采集暂以注释停用。
 ---
 
 # OpenClaw 每日数据采集技能
 
-调用项目根目录的 `scripts/all.sh` 完成四大日报采集：赤兔 KPI 客服报表、飞猪订单列表、SYCM 流量看板、阿里妈妈投放日报。
+调用项目根目录的 `scripts/all.sh` 完成“店铺每日登记”数据采集。当前流程保留赤兔 KPI、飞猪订单、SYCM 流量看板作为必要数据源，阿里妈妈投放日报暂以注释停用。
 
 ## 快速开始
 
@@ -27,7 +27,7 @@ cd ~/Tourism_Xiangwang
 ./scripts/kpi_reports.sh 2026-05-01
 ./scripts/fliggy_orders.sh 2026-05-01
 ./scripts/sycm_flow.sh 2026-05-01
-./scripts/alimama_daily.sh 2026-05-01
+# ./scripts/alimama_daily.sh 2026-05-01  # 当前店铺每日登记模式下停用
 ./scripts/apply_cross_table_rules.sh 2026-05-01
 ```
 
@@ -58,7 +58,7 @@ PASS=your_mysql_password
 | 赤兔KPI客服报表 | `Xiangwang.customer_service_data_daily`、`Xiangwang.customer_service_performance_summary`、`Xiangwang.customer_service_performance_workload_analysis` |
 | 飞猪订单列表 | `Xiangwang.order_list`、`Xiangwang.shop_daily_key_data` |
 | SYCM流量看板 | `Xiangwang.shop_daily_key_data`、`Xiangwang.shop_data_daily_registration` |
-| 阿里妈妈投放日报 | `Xiangwang.star_store`、`Xiangwang.tmall_express`、`Xiangwang.gravity_rubiks_cube`、`Xiangwang.wanxiangtai`、`Xiangwang.wanxiangtai_2` |
+| 阿里妈妈投放日报 | 当前停用，历史目标表保留为注释：`Xiangwang.star_store`、`Xiangwang.tmall_express`、`Xiangwang.gravity_rubiks_cube`、`Xiangwang.wanxiangtai`、`Xiangwang.wanxiangtai_2` |
 
 `Xiangwang.shop_daily_key_data` 的 `日期` 索引可能非唯一，写入必须保持 `UPDATE` 后 `INSERT ... WHERE NOT EXISTS`，不要改回 `ON DUPLICATE KEY UPDATE`。
 
@@ -93,9 +93,9 @@ PASS=your_mysql_password
 
 ## 跨表规则（采集完成后自动应用）
 
-采集阶段各脚本只负责写入各自的基础表，跨表衍生字段由 `scripts/apply_cross_table_rules.sh` 统一补齐，共 8 条规则：
+采集阶段各脚本只负责写入各自的基础表，跨表衍生字段由 `scripts/apply_cross_table_rules.sh` 统一补齐。当前只执行“店铺每日登记”所需规则，其余规则保留为注释：
 
-### 规则 1：阿里妈妈投放数据 → shop_daily_key_data
+### 停用规则：阿里妈妈投放数据 → shop_daily_key_data
 | 源表 | 目标字段 |
 |------|----------|
 | `star_store.cost/imp/click` | `pingxiaobao_cost/imp/click` |
@@ -105,20 +105,17 @@ PASS=your_mysql_password
 
 注意：阿里妈妈表 cost 字段存储为 `￥1,234.56` 格式，写入 shop_daily_key_data 前须 `CAST(REPLACE(REPLACE(cost,'￥',''),',','') AS DECIMAL)` 去除货币符号。
 
-### 规则 2：KPI 询单人数汇总 → chat_volume
+### 停用规则：KPI 询单人数汇总 → chat_volume
 `customer_service_performance_summary` 所有客服 `询单人数` SUM → `shop_daily_key_data.chat_volume`
 
-### 规则 3：四个渠道 booked_cabin 默认值 = 3
+### 停用规则：四个渠道 booked_cabin 默认值 = 3
 `pingxiaobao_booked_cabin` / `tmall_express_booked_cabin` / `gravity_rubiks_cube_booked_cabin` / `mansa_dae_booked_cabin` 均设为 3
 
-### 规则 4：公式字段（shop_daily_key_data 内横向计算）
+### 当前执行：流量来源汇总
 - `流量来源汇总` = `流量来源广告_uv` + `流量来源平台_uv`
-- `直引万品点击量` = pingxiaobao_click + tmall_express_click + gravity_rubiks_cube_click + mansa_dae_click
-- `cost_total` = pingxiaobao_cost + tmall_express_cost + gravity_rubiks_cube_cost + mansa_dae_cost
-- `imp_total` = pingxiaobao_imp + tmall_express_imp + gravity_rubiks_cube_imp + mansa_dae_views
-- `click_total` = pingxiaobao_click + tmall_express_click + gravity_rubiks_cube_click + mansa_dae_click
+- `直引万品点击量`、`cost_total`、`imp_total`、`click_total` 当前停用，保留为注释。
 
-### 规则 5：shop_daily_key_data → shop_data_daily_registration
+### 当前执行：shop_daily_key_data → shop_data_daily_registration
 | 源字段 | 目标字段 |
 |--------|----------|
 | `total_pv` | `PV` |
@@ -127,14 +124,14 @@ PASS=your_mysql_password
 | `流量来源汇总` | `PaidUV` |
 | `total_bookings` | `下单买家数` |
 
-### 规则 6：KPI 咨询人数汇总 → 店铺每日登记
+### 当前执行：KPI 咨询人数汇总 → 店铺每日登记
 `customer_service_performance_summary` 所有客服 `咨询人数` SUM → `shop_data_daily_registration.咨询人数`
 
-### 规则 7：转化率公式（shop_data_daily_registration 内横向计算）
+### 当前执行：转化率公式（shop_data_daily_registration 内横向计算）
 - `咨询转化率` = `下单买家数` / `咨询人数`
 - `下单转化率` = `下单买家数` / `UV`
 
-### 规则 8：super_recommendation_cost 暂无数据来源，暂时留空
+### 停用规则：super_recommendation_cost 暂无数据来源，暂时留空
 
 ## 执行流程
 
@@ -150,17 +147,13 @@ PASS=your_mysql_password
 3. SYCM流量看板采集
    - HTTP采集 → 转换SQL（含关注店铺人数）→ 入库
    ↓
-4. 阿里妈妈投放日报采集
-   - HTTP采集 → 数据转换 → 入库（5张表）
-   ↓
-5. 跨表规则应用（补齐衍生字段）
-   - 8条规则：阿里妈妈数据 → shop_daily_key_data
-   - KPI汇总 → chat_volume / 咨询人数
-   - 公式计算：流量来源汇总、直引万品点击量、投放汇总
+4. 跨表规则应用（补齐店铺每日登记字段）
+   - 公式计算：流量来源汇总
    - shop_daily_key_data → shop_data_daily_registration
+   - KPI汇总 → 咨询人数
    - 转化率计算
    ↓
-完成（总耗时约3-4分钟）
+完成
 ```
 
 ## 数据管理规范

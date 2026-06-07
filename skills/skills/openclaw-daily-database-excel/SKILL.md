@@ -5,7 +5,7 @@ description: OpenClaw 侧导出 Xiangwang 数据库当日数据到 Excel。用�
 
 # OpenClaw 当日数据库 Excel 导出技能
 
-从 `Xiangwang` 数据库读取指定日期相关的日报表数据，并生成一个 Excel 工作簿。每张有当日数据的业务表导出为一个 sheet，另有 `overview` 汇总 sheet 展示导出表的当日行数。
+从 `Xiangwang` 数据库读取指定日期的店铺每日登记数据，并生成一个 Excel 工作簿。历史多表导出配置保留为代码注释，当前默认只导出 `shop_data_daily_registration`。
 
 ## 快速开始
 
@@ -40,7 +40,7 @@ exports/daily_database_YYYY-MM-DD.xlsx
 
 ## 表格样式
 
-所有导出的 Excel 表格统一复用阿里妈妈月汇总表风格：
+所有导出的 Excel 表格统一复用默认日报表格风格：
 
 - 表头深蓝底：`FF305496`
 - 表头浅色字体：`FFF2F2F2`
@@ -88,20 +88,13 @@ python3 skills/skills/openclaw-daily-database-excel/scripts/export_daily_databas
 
 ## 导出范围
 
-默认导出这些日报目标表：
+当前默认只导出这个日报目标表：
 
-- `customer_service_data_daily`，日期列 `日期`
-- `customer_service_performance_summary`，日期列 `date_time`
-- `customer_service_performance_workload_analysis`，日期列 `date_time`
-- `shop_daily_key_data`，日期列 `日期`
 - `shop_data_daily_registration`，日期列 `日期`
-- `star_store`，日期列 `date_time`
-- `tmall_express`，日期列 `date_time`
-- `gravity_rubiks_cube`，日期列 `date_time`
-- `wanxiangtai`，日期列 `date_time`
-- `wanxiangtai_2`，日期列 `date_time`
 
-如果要导出库里所有存在日期列且当日有数据的表，加 `--all-date-tables`。脚本会自动识别 `日期`、`date_time`、`order_date`、`biz_date` 等常见日期列。
+赤兔、店铺日度关键数据、订单明细和阿里妈妈投放明细当前都在脚本中以注释/停用表形式保留。若要恢复多表导出，需要取消对应注释，并从 `DISABLED_TABLES` 移除对应表名。
+
+如果要导出库里所有存在日期列且当日有数据的表，加 `--all-date-tables`。脚本会自动识别 `日期`、`date_time`、`order_date`、`biz_date` 等常见日期列，并继续跳过已停用的非登记表。
 
 默认跳过当日 `0` 行的空表，不创建空 sheet。
 

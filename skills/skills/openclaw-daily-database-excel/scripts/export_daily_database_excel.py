@@ -4,7 +4,8 @@ from __future__ import annotations
 import argparse
 import os
 import re
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
+# from datetime import timedelta  # 恢复阿里妈妈月汇总周期逻辑时需要
 from decimal import Decimal
 from pathlib import Path
 from typing import Iterable
@@ -16,28 +17,43 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
 PROJECT_ROOT = Path(__file__).resolve().parents[5]
 DEFAULT_TABLES = (
-    ("customer_service_data_daily", "日期", "赤兔-人均日接入"),
-    ("customer_service_performance_summary", "date_time", "赤兔-每周店铺个人数据"),
-    ("customer_service_performance_workload_analysis", "date_time", "赤兔-客服数据23年新"),
-    ("shop_daily_key_data", "日期", "店铺日度关键数据"),
+    # 当前报表只输出“店铺每日登记”；恢复多表导出时取消下列注释。
+    # ("customer_service_data_daily", "日期", "赤兔-人均日接入"),
+    # ("customer_service_performance_summary", "date_time", "赤兔-每周店铺个人数据"),
+    # ("customer_service_performance_workload_analysis", "date_time", "赤兔-客服数据23年新"),
+    # ("shop_daily_key_data", "日期", "店铺日度关键数据"),
     ("shop_data_daily_registration", "日期", "店铺每日登记"),
-    ("star_store", "date_time", "阿里妈妈-明星店铺"),
-    ("tmall_express", "date_time", "阿里妈妈-直通车"),
-    ("gravity_rubiks_cube", "date_time", "阿里妈妈-引力魔方"),
-    ("wanxiangtai", "date_time", "阿里妈妈-万相台"),
-    ("wanxiangtai_2", "date_time", "阿里妈妈-万相台2"),
+    # 以下独立阿里妈妈明细表暂不导出，业务恢复时取消注释并从 DISABLED_TABLES 移除。
+    # ("star_store", "date_time", "阿里妈妈-明星店铺"),
+    # ("tmall_express", "date_time", "阿里妈妈-直通车"),
+    # ("gravity_rubiks_cube", "date_time", "阿里妈妈-引力魔方"),
+    # ("wanxiangtai", "date_time", "阿里妈妈-万相台"),
+    # ("wanxiangtai_2", "date_time", "阿里妈妈-万相台2"),
 )
+DISABLED_TABLES = {
+    "customer_service_data_daily",
+    "customer_service_performance_summary",
+    "customer_service_performance_workload_analysis",
+    "order_list",
+    "shop_daily_key_data",
+    "star_store",
+    "tmall_express",
+    "gravity_rubiks_cube",
+    "wanxiangtai",
+    "wanxiangtai_2",
+}
 TABLE_DISPLAY_NAMES = {table_name: display_name for table_name, _, display_name in DEFAULT_TABLES}
 DATE_COLUMN_CANDIDATES = ("日期", "date_time", "order_date", "biz_date", "collection_date")
 EXCLUDE_COLUMNS = {"created_at", "updated_at"}
-ALIMAMA_CHANNELS = ("明星店铺", "直通车", "引力魔方", "万相台")
-ALIMAMA_TABLE_MAP = {
-    "明星店铺": "star_store",
-    "直通车": "tmall_express",
-    "引力魔方": "gravity_rubiks_cube",
-    "万相台": "wanxiangtai",
-}
-ALIMAMA_BASE_METRICS = ("cost", "imp", "click", "order", "sales", "shopping_cart", "bookmark_product", "bookmark_store")
+# 以下阿里妈妈月汇总/预算明细依赖独立投放表，当前业务暂不输出，先以注释保留。
+# ALIMAMA_CHANNELS = ("明星店铺", "直通车", "引力魔方", "万相台")
+# ALIMAMA_TABLE_MAP = {
+#     "明星店铺": "star_store",
+#     "直通车": "tmall_express",
+#     "引力魔方": "gravity_rubiks_cube",
+#     "万相台": "wanxiangtai",
+# }
+# ALIMAMA_BASE_METRICS = ("cost", "imp", "click", "order", "sales", "shopping_cart", "bookmark_product", "bookmark_store")
 NUMERIC_TEXT_RE = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$")
 HEADER_FILL = "FF305496"
 HEADER_FONT_COLOR = "FFF2F2F2"
@@ -47,54 +63,62 @@ DEFAULT_FONT = "等线"
 
 SHEET_COLUMN_EXCLUSIONS: dict[str, set[str]] = {
     "店铺每日登记": {"id"},
-    "阿里妈妈-明星店铺": {"id", "cart_rate"},
-    "阿里妈妈-直通车": {"id", "collection_cart_cost", "collection_cart_count", "collection_cart_rate"},
-    "阿里妈妈-引力魔方": {"id", "collection_cart_cost", "collection_cart_count", "collection_cart_rate"},
-    "阿里妈妈-万相台": {"id", "bookmark_store", "collection_cart_cost", "collection_cart_count", "collection_cart_rate"},
-    "店铺日度关键数据": {"id"},
+    # 当前只输出“店铺每日登记”，店铺日度关键数据列排除规则先保留为注释。
+    # "店铺日度关键数据": {"id"},
+    # 独立阿里妈妈明细表暂不导出，列排除规则先保留为注释。
+    # "阿里妈妈-明星店铺": {"id", "cart_rate"},
+    # "阿里妈妈-直通车": {"id", "collection_cart_cost", "collection_cart_count", "collection_cart_rate"},
+    # "阿里妈妈-引力魔方": {"id", "collection_cart_cost", "collection_cart_count", "collection_cart_rate"},
+    # "阿里妈妈-万相台": {"id", "bookmark_store", "collection_cart_cost", "collection_cart_count", "collection_cart_rate"},
 }
 
 SHEET_DATE_REFORMAT: dict[str, str] = {
-    "赤兔-人均日接入": "日期",
-    "赤兔-每周店铺个人数据": "date_time",
-    "赤兔-客服数据23年新": "date_time",
-    "店铺日度关键数据": "日期",
+    # 当前只输出“店铺每日登记”，其他表日期格式规则先保留为注释。
+    # "赤兔-人均日接入": "日期",
+    # "赤兔-每周店铺个人数据": "date_time",
+    # "赤兔-客服数据23年新": "date_time",
+    # "店铺日度关键数据": "日期",
     "店铺每日登记": "日期",
-    "阿里妈妈-明星店铺": "date_time",
-    "阿里妈妈-直通车": "date_time",
-    "阿里妈妈-引力魔方": "date_time",
-    "阿里妈妈-万相台": "date_time",
+    # 独立阿里妈妈明细表暂不导出，日期格式规则先保留为注释。
+    # "阿里妈妈-明星店铺": "date_time",
+    # "阿里妈妈-直通车": "date_time",
+    # "阿里妈妈-引力魔方": "date_time",
+    # "阿里妈妈-万相台": "date_time",
 }
 
 SHEET_DATE_TO_END: set[str] = {
-    "赤兔-每周店铺个人数据",
-    "赤兔-客服数据23年新",
+    # 当前只输出“店铺每日登记”，赤兔表日期移到末尾规则先保留为注释。
+    # "赤兔-每周店铺个人数据",
+    # "赤兔-客服数据23年新",
 }
 
 SHEET_COLUMN_WIDTHS: dict[str, dict[str, float]] = {
-    "赤兔-人均日接入": {
-        "询单最终付款成功率": 27.52,
-        "__default__": 13.42,
-    },
+    # 当前只输出“店铺每日登记”，赤兔列宽规则先保留为注释。
+    # "赤兔-人均日接入": {
+    #     "询单最终付款成功率": 27.52,
+    #     "__default__": 13.42,
+    # },
 }
 
-SHEET_CURRENCY_COLUMNS: dict[str, set[str]] = {
-    "阿里妈妈-明星店铺": {"cost", "cpc"},
-    "阿里妈妈-直通车": {"cost", "cpc"},
-    "阿里妈妈-引力魔方": {"cost", "cpm", "roi"},
-    "阿里妈妈-万相台": {"cost"},
-}
-
-SHEET_DECIMAL_FORMATS: dict[str, dict[str, str]] = {
-    "阿里妈妈-明星店铺": {"roi": "0.00"},
-}
+# 独立阿里妈妈明细表暂不导出，货币/小数格式规则先保留为注释。
+# SHEET_CURRENCY_COLUMNS: dict[str, set[str]] = {
+#     "阿里妈妈-明星店铺": {"cost", "cpc"},
+#     "阿里妈妈-直通车": {"cost", "cpc"},
+#     "阿里妈妈-引力魔方": {"cost", "cpm", "roi"},
+#     "阿里妈妈-万相台": {"cost"},
+# }
+#
+# SHEET_DECIMAL_FORMATS: dict[str, dict[str, str]] = {
+#     "阿里妈妈-明星店铺": {"roi": "0.00"},
+# }
 
 SHEET_COL_RANGE_FORMATS: dict[str, list[tuple[int, int, str]]] = {
-    "店铺日度关键数据": [
-        (23, 24, "#,##0.00"),   # X: cost_total
-        (24, 26, "#,##0"),       # Y-Z: imp_total, click_total
-        (26, 30, "0.00"),        # AA-AD: booked_cabin × 4
-    ],
+    # 当前只输出“店铺每日登记”，店铺日度关键数据格式规则先保留为注释。
+    # "店铺日度关键数据": [
+    #     (23, 24, "#,##0.00"),   # X: cost_total
+    #     (24, 26, "#,##0"),       # Y-Z: imp_total, click_total
+    #     (26, 30, "0.00"),        # AA-AD: booked_cabin × 4
+    # ],
 }
 
 
@@ -163,7 +187,7 @@ def all_date_tables(cursor, database: str) -> list[tuple[str, str, str]]:
     seen = set()
     tables = []
     for table_name, column_name in cursor.fetchall():
-        if table_name in seen:
+        if table_name in seen or table_name in DISABLED_TABLES:
             continue
         seen.add(table_name)
         tables.append((table_name, column_name, TABLE_DISPLAY_NAMES.get(table_name, table_name)))
@@ -280,24 +304,25 @@ def write_sheet(workbook, sheet_name: str, columns: Iterable[str], rows: Iterabl
 
 
 COLUMN_FORMAT_RULES: dict[str, dict[str, str]] = {
-    "赤兔-人均日接入": {
-        "回复率": "0.00%",
-        "询单最终付款成功率": "0.00%",
-        "评价发送率": "0.00%",
-        "客户满意比": "0.0000",
-        "很满意": "0",
-        "满意": "0",
-        "一般": "0",
-        "不满意": "0",
-        "很不满意": "0",
-    },
-    "赤兔-每周店铺个人数据": {
-        "询单人数": "0",
-    },
-    "赤兔-客服数据23年新": {
-        "未回复人数": "0.00%",
-        "旺旺回复率": "0.00%",
-    },
+    # 当前只输出“店铺每日登记”，赤兔格式规则先保留为注释。
+    # "赤兔-人均日接入": {
+    #     "回复率": "0.00%",
+    #     "询单最终付款成功率": "0.00%",
+    #     "评价发送率": "0.00%",
+    #     "客户满意比": "0.0000",
+    #     "很满意": "0",
+    #     "满意": "0",
+    #     "一般": "0",
+    #     "不满意": "0",
+    #     "很不满意": "0",
+    # },
+    # "赤兔-每周店铺个人数据": {
+    #     "询单人数": "0",
+    # },
+    # "赤兔-客服数据23年新": {
+    #     "未回复人数": "0.00%",
+    #     "旺旺回复率": "0.00%",
+    # },
     "店铺每日登记": {
         "咨询转化率": "0.00%",
         "下单转化率": "0.00%",
@@ -380,19 +405,20 @@ def _handle_delay_chat_volume(workbook, summary: list) -> None:
 
 
 DELAY_COLUMNS: dict[str, set[str]] = {
-    "赤兔-人均日接入": {
-        "询单最终付款成功率",
-        "评价发送率",
-        "客户满意比",
-        "很满意",
-        "满意",
-        "一般",
-        "不满意",
-        "很不满意",
-    },
-    "赤兔-每周店铺个人数据": {
-        "询单人数",
-    },
+    # 当前只输出“店铺每日登记”，赤兔延迟统计规则先保留为注释。
+    # "赤兔-人均日接入": {
+    #     "询单最终付款成功率",
+    #     "评价发送率",
+    #     "客户满意比",
+    #     "很满意",
+    #     "满意",
+    #     "一般",
+    #     "不满意",
+    #     "很不满意",
+    # },
+    # "赤兔-每周店铺个人数据": {
+    #     "询单人数",
+    # },
 }
 
 
@@ -447,43 +473,44 @@ def _apply_date_reformat(workbook) -> None:
                             continue
 
 
-def _apply_currency_separator_formats(workbook) -> None:
-    """Apply currency format and thousand separator to designated columns."""
-    for worksheet in workbook.worksheets:
-        name = worksheet.title
-        currency_cols = SHEET_CURRENCY_COLUMNS.get(name, set())
-        decimal_fmts = SHEET_DECIMAL_FORMATS.get(name, {})
-        if not currency_cols and not decimal_fmts:
-            continue
-        header_row = worksheet[1]
-        col_map: dict[str, int] = {}
-        for idx, cell in enumerate(header_row):
-            col_map[cell.value] = idx
-
-        for row in worksheet.iter_rows(min_row=2):
-            for col_name in currency_cols:
-                if col_name not in col_map:
-                    continue
-                cell = row[col_map[col_name]]
-                if cell.value is not None:
-                    val = cell.value
-                    if isinstance(val, (int, float)):
-                        cell.number_format = '￥#,##0.00'
-                    elif isinstance(val, str):
-                        try:
-                            cleaned = val.replace(",", "").replace("，", "").replace("￥", "").replace("¥", "").strip()
-                            cell.value = float(cleaned)
-                            cell.number_format = '￥#,##0.00'
-                        except (ValueError, TypeError):
-                            pass
-            for col_name, fmt in decimal_fmts.items():
-                if col_name not in col_map:
-                    continue
-                cell = row[col_map[col_name]]
-                if cell.value is not None:
-                    cell.number_format = fmt
-
-
+# 独立阿里妈妈明细表暂不导出，相关格式函数先保留为注释。
+# def _apply_currency_separator_formats(workbook) -> None:
+#     """Apply currency format and thousand separator to designated columns."""
+#     for worksheet in workbook.worksheets:
+#         name = worksheet.title
+#         currency_cols = SHEET_CURRENCY_COLUMNS.get(name, set())
+#         decimal_fmts = SHEET_DECIMAL_FORMATS.get(name, {})
+#         if not currency_cols and not decimal_fmts:
+#             continue
+#         header_row = worksheet[1]
+#         col_map: dict[str, int] = {}
+#         for idx, cell in enumerate(header_row):
+#             col_map[cell.value] = idx
+#
+#         for row in worksheet.iter_rows(min_row=2):
+#             for col_name in currency_cols:
+#                 if col_name not in col_map:
+#                     continue
+#                 cell = row[col_map[col_name]]
+#                 if cell.value is not None:
+#                     val = cell.value
+#                     if isinstance(val, (int, float)):
+#                         cell.number_format = '￥#,##0.00'
+#                     elif isinstance(val, str):
+#                         try:
+#                             cleaned = val.replace(",", "").replace("，", "").replace("￥", "").replace("¥", "").strip()
+#                             cell.value = float(cleaned)
+#                             cell.number_format = '￥#,##0.00'
+#                         except (ValueError, TypeError):
+#                             pass
+#             for col_name, fmt in decimal_fmts.items():
+#                 if col_name not in col_map:
+#                     continue
+#                 cell = row[col_map[col_name]]
+#                 if cell.value is not None:
+#                     cell.number_format = fmt
+#
+#
 def _apply_shop_daily_reg_thousand_sep(workbook) -> None:
     """Apply thousand separator to B-G columns of 店铺每日登记."""
     for worksheet in workbook.worksheets:
@@ -533,259 +560,252 @@ def _apply_sheet_column_widths(workbook) -> None:
                 worksheet.column_dimensions[col_letter].width = default_width
 
 
-def _monthly_period_for_date(ref_date: date) -> tuple[date, date, str]:
-    if ref_date.month == 1 and ref_date.day <= 20:
-        start, end, label = date(ref_date.year, 1, 1), date(ref_date.year, 1, 20), f"{ref_date.year}年1月"
-    elif ref_date.day <= 20:
-        start = date(ref_date.year, ref_date.month - 1, 21)
-        end = date(ref_date.year, ref_date.month, 20)
-        label = f"{start.month}月{start.day}号-{end.month}月{end.day}号"
-    elif ref_date.month == 12:
-        start, end, label = date(ref_date.year, 11, 21), date(ref_date.year, 12, 31), "11月21号-12月31号"
-    else:
-        start = date(ref_date.year, ref_date.month, 21)
-        end = date(ref_date.year, ref_date.month + 1, 20)
-        label = f"{start.month}月{start.day}号-{end.month}月{end.day}号"
-    return start, end, label
-
-
-def _previous_period(start: date) -> tuple[date, date, str]:
-    prev_end = start - timedelta(days=1)
-    if start == date(start.year, 1, 1):
-        return date(start.year - 1, 11, 21), date(start.year - 1, 12, 31), "11月21号-12月31号"
-    if start.day == 21:
-        return date(start.year, start.month - 1, 21), date(start.year, start.month, 20), f"{start.month - 1}月21号-{start.month}月20号"
-    return date(start.year, start.month - 1, 21), date(start.year, start.month, 20), f"{start.month - 1}月21号-{start.month}月20号"
-
-
-def _parse_alimama_number(value) -> float:
-    if value is None or isinstance(value, bool):
-        return 0.0
-    if isinstance(value, (int, float)):
-        return float(value)
-    if isinstance(value, Decimal):
-        return float(value)
-    if not isinstance(value, str):
-        return 0.0
-    text = value.strip()
-    if not text or text == "-":
-        return 0.0
-    text = text.replace(",", "").replace("，", "").replace("￥", "").replace("¥", "").replace("%", "")
-    try:
-        return float(text)
-    except ValueError:
-        return 0.0
-
-
-def _fetch_alimama_aggregate(cursor, database: str, channel_tables: list[str], start: date, end: date) -> dict[str, dict[str, float]]:
-    result: dict[str, dict[str, float]] = {}
-    for channel, table in ALIMAMA_TABLE_MAP.items():
-        cursor.execute(
-            f"SELECT date_time, cost, imp, click, order_count, sales, shopping_cart, bookmark_product, bookmark_store "
-            f"FROM `{database}`.`{table}` WHERE date_time BETWEEN %s AND %s",
-            (start.isoformat(), end.isoformat()),
-        )
-        totals = {key: 0.0 for key in ALIMAMA_BASE_METRICS}
-        total_bookmark = 0.0
-        for row in cursor.fetchall():
-            totals["cost"] += _parse_alimama_number(row[1])
-            totals["imp"] += _parse_alimama_number(row[2])
-            totals["click"] += _parse_alimama_number(row[3])
-            totals["order"] += _parse_alimama_number(row[4])
-            totals["sales"] += _parse_alimama_number(row[5])
-            totals["shopping_cart"] += _parse_alimama_number(row[6])
-            totals["bookmark_product"] += _parse_alimama_number(row[7])
-            totals["bookmark_store"] += _parse_alimama_number(row[8])
-        totals["bookmark_total"] = totals["bookmark_product"] + totals["bookmark_store"]
-        result[channel] = totals
-    return result
-
-
-def build_alimama_monthly_sheet(workbook, conn, args, biz_date_str: str, used_names: set[str]) -> None:
-    biz_date = datetime.strptime(biz_date_str, "%Y-%m-%d").date()
-    period_start, period_end, period_label = _monthly_period_for_date(biz_date)
-    prev_start, prev_end, _ = _previous_period(period_start)
-
-    with conn.cursor() as cursor:
-        current_data = _fetch_alimama_aggregate(cursor, args.database, list(ALIMAMA_TABLE_MAP.values()), period_start, period_end)
-        previous_data = _fetch_alimama_aggregate(cursor, args.database, list(ALIMAMA_TABLE_MAP.values()), prev_start, prev_end)
-
-    sheet_name = safe_sheet_name("阿里妈妈月汇总", used_names)
-    ws = workbook.create_sheet(sheet_name)
-
-    headers = [
-        "", "花费", "展示", "点击", "订单", "销量",
-        "加入购物车", "宝贝收藏", "店铺收藏",
-        "CTR", "CPC", "CPM", "ROI", "CVR",
-        "ASP", "订单成本", "加购成本",
-    ]
-    ws.append(headers)
-
-    def write_period_block(label: str, data: dict, prev_data: dict | None = None):
-        ws.append([label] + [""] * (len(headers) - 1))
-        block_start = ws.max_row + 1
-        for channel in ALIMAMA_CHANNELS:
-            d = data.get(channel, {})
-            row_num = ws.max_row + 1
-            cost = d.get("cost", 0)
-            imp = d.get("imp", 0)
-            click = d.get("click", 0)
-            order = d.get("order", 0)
-            sales = d.get("sales", 0)
-            cart = d.get("shopping_cart", 0)
-            bp = d.get("bookmark_product", 0)
-            bs = d.get("bookmark_store", 0)
-            ws.append([
-                channel, cost, imp, click, order, sales,
-                cart, bp, bs,
-                f"=D{row_num}/C{row_num}",          # CTR
-                f"=B{row_num}/D{row_num}",          # CPC
-                f"=(B{row_num}/C{row_num})*1000",    # CPM
-                f"=F{row_num}/B{row_num}",          # ROI
-                f"=E{row_num}/D{row_num}",          # CVR
-                f"=IF(E{row_num}=0,0,F{row_num}/E{row_num})",  # ASP
-                f"=IF(E{row_num}=0,0,B{row_num}/E{row_num})",  # 订单成本
-                f"=B{row_num}/G{row_num}",          # 加购成本
-            ])
-
-        total_row = ws.max_row + 1
-        ws.append(["总计"] + [f"=SUM({chr(65+c)}{block_start}:{chr(65+c)}{total_row-1})" for c in range(1, 9)] + [""] * 8)
-        ws.cell(total_row, 10).value = f"=D{total_row}/C{total_row}"  # CTR
-        ws.cell(total_row, 11).value = f"=B{total_row}/D{total_row}"  # CPC
-        ws.cell(total_row, 12).value = f"=(B{total_row}/C{total_row})*1000"  # CPM
-        ws.cell(total_row, 13).value = f"=F{total_row}/B{total_row}"  # ROI
-        ws.cell(total_row, 14).value = f"=E{total_row}/D{total_row}"  # CVR
-        ws.cell(total_row, 15).value = f"=IF(E{total_row}=0,0,F{total_row}/E{total_row})"  # ASP
-        ws.cell(total_row, 16).value = f"=IF(E{total_row}=0,0,B{total_row}/E{total_row})"  # 订单成本
-        ws.cell(total_row, 17).value = f"=B{total_row}/G{total_row}"  # 加购成本
-
-        return block_start, total_row
-
-    write_period_block(period_label, current_data)
-    _, prev_total = write_period_block(f"{prev_start.month}月{prev_start.day}号-{prev_end.month}月{prev_end.day}号", previous_data)
-
-    # Hide the previous period rows
-    for row in range(prev_total - len(ALIMAMA_CHANNELS) - 1, prev_total + 1):
-        ws.row_dimensions[row].hidden = True
-
-    ws.freeze_panes = "B3"
-
-
-def _apply_monthly_summary_formats(workbook) -> None:
-    """Apply currency/thousand-sep/percentage/accounting formats to 阿里妈妈月汇总."""
-    currency_cols = {"花费", "销量", "CTR", "CPC", "CVR", "ASP", "订单成本", "加购成本"}
-    thousand_cols = {"展示", "点击", "订单", "加入购物车", "宝贝收藏", "店铺收藏"}
-    for worksheet in workbook.worksheets:
-        if worksheet.title != "阿里妈妈月汇总":
-            continue
-        header_row = worksheet[1]
-        col_map: dict[str, int] = {}
-        for idx, cell in enumerate(header_row):
-            if cell.value in currency_cols | thousand_cols | {"ROI", "CPM"}:
-                col_map[cell.value] = idx
-
-        for row in worksheet.iter_rows(min_row=2):
-            for col_name, col_idx in col_map.items():
-                cell = row[col_idx]
-                if col_name in currency_cols:
-                    if cell.value is not None:
-                        cell.number_format = '￥#,##0.00'
-                elif col_name in thousand_cols:
-                    if cell.value is not None:
-                        cell.number_format = '#,##0'
-                elif col_name == "ROI":
-                    if cell.value is not None:
-                        cell.number_format = '0.00%'
-                elif col_name == "CPM":
-                    if cell.value is not None:
-                        cell.number_format = '_ \\¥ * #,##0.00_ ;_ \\¥ * \\-#,##0.00_ ;_ \\¥ * "-"??_ ;_ @_ '
-
-
-ALIMAMA_BUDGET_CHANNELS = [
-    ("Pingxiaobao(品销宝）", "star_store", "cost", "imp", "click"),
-    ("Tmall Express（直通车）", "tmall_express", "cost", "imp", "click"),
-    ("Gravity rubik's cube（引力魔方）", "gravity_rubiks_cube", "cost", "imp", "click"),
-    ("wanxiangtai（万相台）", "wanxiangtai", "cost", "imp", "click"),
-]
-
-
-def build_alimama_budget_sheet(workbook, conn, database: str, biz_date: str, start_date: str, end_date: str, used_names: set[str]) -> None:
-    """Build 阿里妈妈预算明细 sheet with Budget/Act.Cost/IMP/Click per channel."""
-    from math import ceil
-    from datetime import datetime as dt_type, timedelta
-
-    sheet_name = safe_sheet_name("阿里妈妈预算明细", used_names)
-    ws = workbook.create_sheet(sheet_name)
-
-    # Row 2: sub-headers
-    sub_headers = []
-    for _ in range(4):
-        sub_headers.extend(["Budget", "Act. Cost", "IMP", "Click"])
-    ws.append(["Date"] + sub_headers + ["Remark"])
-    # Row 1: main headers with merged cells
-    ws.insert_rows(1)
-    ws.cell(1, 1, "Date")
-    for i, (label, _, _, _, _) in enumerate(ALIMAMA_BUDGET_CHANNELS):
-        start_col = 2 + i * 4
-        end_col = start_col + 3
-        ws.cell(1, start_col, label)
-        ws.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=end_col)
-    ws.cell(1, 18, "Remark")
-    ws.merge_cells("A1:A2")
-    ws.merge_cells("R1:R2")
-
-    # Determine date range
-    if start_date and end_date:
-        dates = []
-        d = dt_type.strptime(start_date, "%Y-%m-%d").date()
-        end = dt_type.strptime(end_date, "%Y-%m-%d").date()
-        while d <= end:
-            dates.append(d.isoformat())
-            d += timedelta(days=1)
-    else:
-        dates = [biz_date]
-
-    # Build data rows
-    date_fmt = "YYYY/MM/DD"
-    budget_fmt = '_ \\¥ * #,##0_ ;_ \\¥ * \\-#,##0_ ;_ \\¥ * "-"??_ ;_ @_ '
-    cost_fmt = '"￥"#,##0.00;"￥"\\-#,##0.00'
-    imp_click_fmt = "#,##0"
-
-    with conn.cursor() as cursor:
-        for d in dates:
-            d_dt = dt_type.strptime(d, "%Y-%m-%d")
-            row_data = [d_dt]
-            for _, table, cost_col, imp_col, click_col in ALIMAMA_BUDGET_CHANNELS:
-                cursor.execute(
-                    f"SELECT `{cost_col}`, `{imp_col}`, `{click_col}` "
-                    f"FROM `{database}`.`{table}` WHERE date_time = %s",
-                    (d,),
-                )
-                result = cursor.fetchone()
-                if result:
-                    cost = _parse_alimama_number(result[0])
-                    imp = int(_parse_alimama_number(result[1]))
-                    click = int(_parse_alimama_number(result[2]))
-                else:
-                    cost, imp, click = 0, 0, 0
-                budget = ceil(cost / 500) * 500 if cost > 0 else 0
-                row_data.extend([budget, cost, imp, click])
-            row_data.append("")
-            ws.append(row_data)
-
-            # Apply formats
-            row_num = ws.max_row
-            ws.cell(row_num, 1).number_format = date_fmt
-            for ch_idx in range(4):
-                base = 2 + ch_idx * 4
-                ws.cell(row_num, base).number_format = budget_fmt
-                ws.cell(row_num, base + 1).number_format = cost_fmt
-                ws.cell(row_num, base + 2).number_format = imp_click_fmt
-                ws.cell(row_num, base + 3).number_format = imp_click_fmt
-
-    ws.freeze_panes = "A3"
-
-
+# 阿里妈妈月汇总/预算明细当前不输出，历史实现先保留为注释。
+# 恢复时还需要恢复顶部 ALIMAMA_* 常量、格式规则、build_workbook 调用以及 timedelta import。
+# def _monthly_period_for_date(ref_date: date) -> tuple[date, date, str]:
+#     if ref_date.month == 1 and ref_date.day <= 20:
+#         start, end, label = date(ref_date.year, 1, 1), date(ref_date.year, 1, 20), f"{ref_date.year}年1月"
+#     elif ref_date.day <= 20:
+#         start = date(ref_date.year, ref_date.month - 1, 21)
+#         end = date(ref_date.year, ref_date.month, 20)
+#         label = f"{start.month}月{start.day}号-{end.month}月{end.day}号"
+#     elif ref_date.month == 12:
+#         start, end, label = date(ref_date.year, 11, 21), date(ref_date.year, 12, 31), "11月21号-12月31号"
+#     else:
+#         start = date(ref_date.year, ref_date.month, 21)
+#         end = date(ref_date.year, ref_date.month + 1, 20)
+#         label = f"{start.month}月{start.day}号-{end.month}月{end.day}号"
+#     return start, end, label
+#
+#
+# def _previous_period(start: date) -> tuple[date, date, str]:
+#     prev_end = start - timedelta(days=1)
+#     if start == date(start.year, 1, 1):
+#         return date(start.year - 1, 11, 21), date(start.year - 1, 12, 31), "11月21号-12月31号"
+#     if start.day == 21:
+#         return date(start.year, start.month - 1, 21), date(start.year, start.month, 20), f"{start.month - 1}月21号-{start.month}月20号"
+#     return date(start.year, start.month - 1, 21), date(start.year, start.month, 20), f"{start.month - 1}月21号-{start.month}月20号"
+#
+#
+# def _parse_alimama_number(value) -> float:
+#     if value is None or isinstance(value, bool):
+#         return 0.0
+#     if isinstance(value, (int, float)):
+#         return float(value)
+#     if isinstance(value, Decimal):
+#         return float(value)
+#     if not isinstance(value, str):
+#         return 0.0
+#     text = value.strip()
+#     if not text or text == "-":
+#         return 0.0
+#     text = text.replace(",", "").replace("，", "").replace("￥", "").replace("¥", "").replace("%", "")
+#     try:
+#         return float(text)
+#     except ValueError:
+#         return 0.0
+#
+#
+# def _fetch_alimama_aggregate(cursor, database: str, channel_tables: list[str], start: date, end: date) -> dict[str, dict[str, float]]:
+#     result: dict[str, dict[str, float]] = {}
+#     for channel, table in ALIMAMA_TABLE_MAP.items():
+#         cursor.execute(
+#             f"SELECT date_time, cost, imp, click, order_count, sales, shopping_cart, bookmark_product, bookmark_store "
+#             f"FROM `{database}`.`{table}` WHERE date_time BETWEEN %s AND %s",
+#             (start.isoformat(), end.isoformat()),
+#         )
+#         totals = {key: 0.0 for key in ALIMAMA_BASE_METRICS}
+#         for row in cursor.fetchall():
+#             totals["cost"] += _parse_alimama_number(row[1])
+#             totals["imp"] += _parse_alimama_number(row[2])
+#             totals["click"] += _parse_alimama_number(row[3])
+#             totals["order"] += _parse_alimama_number(row[4])
+#             totals["sales"] += _parse_alimama_number(row[5])
+#             totals["shopping_cart"] += _parse_alimama_number(row[6])
+#             totals["bookmark_product"] += _parse_alimama_number(row[7])
+#             totals["bookmark_store"] += _parse_alimama_number(row[8])
+#         totals["bookmark_total"] = totals["bookmark_product"] + totals["bookmark_store"]
+#         result[channel] = totals
+#     return result
+#
+#
+# def build_alimama_monthly_sheet(workbook, conn, args, biz_date_str: str, used_names: set[str]) -> None:
+#     biz_date = datetime.strptime(biz_date_str, "%Y-%m-%d").date()
+#     period_start, period_end, period_label = _monthly_period_for_date(biz_date)
+#     prev_start, prev_end, _ = _previous_period(period_start)
+#
+#     with conn.cursor() as cursor:
+#         current_data = _fetch_alimama_aggregate(cursor, args.database, list(ALIMAMA_TABLE_MAP.values()), period_start, period_end)
+#         previous_data = _fetch_alimama_aggregate(cursor, args.database, list(ALIMAMA_TABLE_MAP.values()), prev_start, prev_end)
+#
+#     sheet_name = safe_sheet_name("阿里妈妈月汇总", used_names)
+#     ws = workbook.create_sheet(sheet_name)
+#
+#     headers = [
+#         "", "花费", "展示", "点击", "订单", "销量",
+#         "加入购物车", "宝贝收藏", "店铺收藏",
+#         "CTR", "CPC", "CPM", "ROI", "CVR",
+#         "ASP", "订单成本", "加购成本",
+#     ]
+#     ws.append(headers)
+#
+#     def write_period_block(label: str, data: dict, prev_data: dict | None = None):
+#         ws.append([label] + [""] * (len(headers) - 1))
+#         block_start = ws.max_row + 1
+#         for channel in ALIMAMA_CHANNELS:
+#             d = data.get(channel, {})
+#             row_num = ws.max_row + 1
+#             cost = d.get("cost", 0)
+#             imp = d.get("imp", 0)
+#             click = d.get("click", 0)
+#             order = d.get("order", 0)
+#             sales = d.get("sales", 0)
+#             cart = d.get("shopping_cart", 0)
+#             bp = d.get("bookmark_product", 0)
+#             bs = d.get("bookmark_store", 0)
+#             ws.append([
+#                 channel, cost, imp, click, order, sales,
+#                 cart, bp, bs,
+#                 f"=D{row_num}/C{row_num}",
+#                 f"=B{row_num}/D{row_num}",
+#                 f"=(B{row_num}/C{row_num})*1000",
+#                 f"=F{row_num}/B{row_num}",
+#                 f"=E{row_num}/D{row_num}",
+#                 f"=IF(E{row_num}=0,0,F{row_num}/E{row_num})",
+#                 f"=IF(E{row_num}=0,0,B{row_num}/E{row_num})",
+#                 f"=B{row_num}/G{row_num}",
+#             ])
+#
+#         total_row = ws.max_row + 1
+#         ws.append(["总计"] + [f"=SUM({chr(65+c)}{block_start}:{chr(65+c)}{total_row-1})" for c in range(1, 9)] + [""] * 8)
+#         ws.cell(total_row, 10).value = f"=D{total_row}/C{total_row}"
+#         ws.cell(total_row, 11).value = f"=B{total_row}/D{total_row}"
+#         ws.cell(total_row, 12).value = f"=(B{total_row}/C{total_row})*1000"
+#         ws.cell(total_row, 13).value = f"=F{total_row}/B{total_row}"
+#         ws.cell(total_row, 14).value = f"=E{total_row}/D{total_row}"
+#         ws.cell(total_row, 15).value = f"=IF(E{total_row}=0,0,F{total_row}/E{total_row})"
+#         ws.cell(total_row, 16).value = f"=IF(E{total_row}=0,0,B{total_row}/E{total_row})"
+#         ws.cell(total_row, 17).value = f"=B{total_row}/G{total_row}"
+#         return block_start, total_row
+#
+#     write_period_block(period_label, current_data)
+#     _, prev_total = write_period_block(f"{prev_start.month}月{prev_start.day}号-{prev_end.month}月{prev_end.day}号", previous_data)
+#
+#     for row in range(prev_total - len(ALIMAMA_CHANNELS) - 1, prev_total + 1):
+#         ws.row_dimensions[row].hidden = True
+#
+#     ws.freeze_panes = "B3"
+#
+#
+# def _apply_monthly_summary_formats(workbook) -> None:
+#     """Apply currency/thousand-sep/percentage/accounting formats to 阿里妈妈月汇总."""
+#     currency_cols = {"花费", "销量", "CTR", "CPC", "CVR", "ASP", "订单成本", "加购成本"}
+#     thousand_cols = {"展示", "点击", "订单", "加入购物车", "宝贝收藏", "店铺收藏"}
+#     for worksheet in workbook.worksheets:
+#         if worksheet.title != "阿里妈妈月汇总":
+#             continue
+#         header_row = worksheet[1]
+#         col_map: dict[str, int] = {}
+#         for idx, cell in enumerate(header_row):
+#             if cell.value in currency_cols | thousand_cols | {"ROI", "CPM"}:
+#                 col_map[cell.value] = idx
+#
+#         for row in worksheet.iter_rows(min_row=2):
+#             for col_name, col_idx in col_map.items():
+#                 cell = row[col_idx]
+#                 if col_name in currency_cols:
+#                     if cell.value is not None:
+#                         cell.number_format = '￥#,##0.00'
+#                 elif col_name in thousand_cols:
+#                     if cell.value is not None:
+#                         cell.number_format = '#,##0'
+#                 elif col_name == "ROI":
+#                     if cell.value is not None:
+#                         cell.number_format = '0.00%'
+#                 elif col_name == "CPM":
+#                     if cell.value is not None:
+#                         cell.number_format = '_ \\¥ * #,##0.00_ ;_ \\¥ * \\-#,##0.00_ ;_ \\¥ * "-"??_ ;_ @_ '
+#
+#
+# ALIMAMA_BUDGET_CHANNELS = [
+#     ("Pingxiaobao(品销宝）", "star_store", "cost", "imp", "click"),
+#     ("Tmall Express（直通车）", "tmall_express", "cost", "imp", "click"),
+#     ("Gravity rubik's cube（引力魔方）", "gravity_rubiks_cube", "cost", "imp", "click"),
+#     ("wanxiangtai（万相台）", "wanxiangtai", "cost", "imp", "click"),
+# ]
+#
+#
+# def build_alimama_budget_sheet(workbook, conn, database: str, biz_date: str, start_date: str, end_date: str, used_names: set[str]) -> None:
+#     """Build 阿里妈妈预算明细 sheet with Budget/Act.Cost/IMP/Click per channel."""
+#     from math import ceil
+#     from datetime import datetime as dt_type, timedelta
+#
+#     sheet_name = safe_sheet_name("阿里妈妈预算明细", used_names)
+#     ws = workbook.create_sheet(sheet_name)
+#
+#     sub_headers = []
+#     for _ in range(4):
+#         sub_headers.extend(["Budget", "Act. Cost", "IMP", "Click"])
+#     ws.append(["Date"] + sub_headers + ["Remark"])
+#     ws.insert_rows(1)
+#     ws.cell(1, 1, "Date")
+#     for i, (label, _, _, _, _) in enumerate(ALIMAMA_BUDGET_CHANNELS):
+#         start_col = 2 + i * 4
+#         end_col = start_col + 3
+#         ws.cell(1, start_col, label)
+#         ws.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=end_col)
+#     ws.cell(1, 18, "Remark")
+#     ws.merge_cells("A1:A2")
+#     ws.merge_cells("R1:R2")
+#
+#     if start_date and end_date:
+#         dates = []
+#         d = dt_type.strptime(start_date, "%Y-%m-%d").date()
+#         end = dt_type.strptime(end_date, "%Y-%m-%d").date()
+#         while d <= end:
+#             dates.append(d.isoformat())
+#             d += timedelta(days=1)
+#     else:
+#         dates = [biz_date]
+#
+#     date_fmt = "YYYY/MM/DD"
+#     budget_fmt = '_ \\¥ * #,##0_ ;_ \\¥ * \\-#,##0_ ;_ \\¥ * "-"??_ ;_ @_ '
+#     cost_fmt = '"￥"#,##0.00;"￥"\\-#,##0.00'
+#     imp_click_fmt = "#,##0"
+#
+#     with conn.cursor() as cursor:
+#         for d in dates:
+#             d_dt = dt_type.strptime(d, "%Y-%m-%d")
+#             row_data = [d_dt]
+#             for _, table, cost_col, imp_col, click_col in ALIMAMA_BUDGET_CHANNELS:
+#                 cursor.execute(
+#                     f"SELECT `{cost_col}`, `{imp_col}`, `{click_col}` "
+#                     f"FROM `{database}`.`{table}` WHERE date_time = %s",
+#                     (d,),
+#                 )
+#                 result = cursor.fetchone()
+#                 if result:
+#                     cost = _parse_alimama_number(result[0])
+#                     imp = int(_parse_alimama_number(result[1]))
+#                     click = int(_parse_alimama_number(result[2]))
+#                 else:
+#                     cost, imp, click = 0, 0, 0
+#                 budget = ceil(cost / 500) * 500 if cost > 0 else 0
+#                 row_data.extend([budget, cost, imp, click])
+#             row_data.append("")
+#             ws.append(row_data)
+#
+#             row_num = ws.max_row
+#             for ch_idx in range(4):
+#                 base = 2 + ch_idx * 4
+#                 ws.cell(row_num, base).number_format = budget_fmt
+#                 ws.cell(row_num, base + 1).number_format = cost_fmt
+#                 ws.cell(row_num, base + 2).number_format = imp_click_fmt
+#                 ws.cell(row_num, base + 3).number_format = imp_click_fmt
+#
+#     ws.freeze_panes = "A3"
+#
+#
 def autosize_workbook(workbook) -> None:
     for worksheet in workbook.worksheets:
         for col_idx in range(1, worksheet.max_column + 1):
@@ -915,17 +935,17 @@ def build_shop_daily_key_sheet(workbook, conn, database: str, biz_date: str, use
         ws.append(out_row)
 
         row_num = ws.max_row
-        # Computed fields
-        gmv = row_dict.get('gmv', 0) or 0
-        total_pax = row_dict.get('total_pax', 0) or 0
-        pingxiaobao_cost = row_dict.get('pingxiaobao_cost', 0) or 0
-        pingxiaobao_cabin = row_dict.get('pingxiaobao_booked_cabin', 0) or 0
-        tmall_cost = row_dict.get('tmall_express_cost', 0) or 0
-        tmall_cabin = row_dict.get('tmall_express_booked_cabin', 0) or 0
-        gravity_cost = row_dict.get('gravity_rubiks_cube_cost', 0) or 0
-        gravity_cabin = row_dict.get('gravity_rubiks_cube_booked_cabin', 0) or 0
-        mansa_cost = row_dict.get('mansa_dae_cost', 0) or 0
-        mansa_cabin = row_dict.get('mansa_dae_booked_cabin', 0) or 0
+        # 以下 computed fields 取值目前没有参与后续计算，先保留为注释。
+        # gmv = row_dict.get('gmv', 0) or 0
+        # total_pax = row_dict.get('total_pax', 0) or 0
+        # pingxiaobao_cost = row_dict.get('pingxiaobao_cost', 0) or 0
+        # pingxiaobao_cabin = row_dict.get('pingxiaobao_booked_cabin', 0) or 0
+        # tmall_cost = row_dict.get('tmall_express_cost', 0) or 0
+        # tmall_cabin = row_dict.get('tmall_express_booked_cabin', 0) or 0
+        # gravity_cost = row_dict.get('gravity_rubiks_cube_cost', 0) or 0
+        # gravity_cabin = row_dict.get('gravity_rubiks_cube_booked_cabin', 0) or 0
+        # mansa_cost = row_dict.get('mansa_dae_cost', 0) or 0
+        # mansa_cabin = row_dict.get('mansa_dae_booked_cabin', 0) or 0
 
         for computed_col in range(32, 37):  # AF-AJ: pax均价 + 4×Booked Amount = 0
             ws.cell(row_num, computed_col, 0)
@@ -956,17 +976,21 @@ def build_workbook(conn, args, biz_date: str, start_date: str = None, end_date: 
             row_count = write_sheet(workbook, display_name, columns, rows, used_sheet_names)
             summary.append((display_name, date_column, row_count))
 
-    build_alimama_monthly_sheet(workbook, conn, args, biz_date or end_date, used_sheet_names)
-    build_alimama_budget_sheet(workbook, conn, args.database, biz_date, start_date, end_date, used_sheet_names)
+    # 阿里妈妈月汇总/预算明细当前不输出，业务恢复时取消注释。
+    # build_alimama_monthly_sheet(workbook, conn, args, biz_date or end_date, used_sheet_names)
+    # build_alimama_budget_sheet(workbook, conn, args.database, biz_date, start_date, end_date, used_sheet_names)
 
     _apply_cell_formats(workbook)
     _apply_date_reformat(workbook)
-    _apply_currency_separator_formats(workbook)
+    # 独立阿里妈妈明细表当前不导出，相关格式化当前不执行。
+    # _apply_currency_separator_formats(workbook)
     _apply_col_range_formats(workbook)
-    _apply_monthly_summary_formats(workbook)
+    # 阿里妈妈月汇总当前不输出，相关格式化当前不执行。
+    # _apply_monthly_summary_formats(workbook)
     _apply_shop_daily_reg_thousand_sep(workbook)
-    _handle_delay_chat_volume(workbook, summary)
-    _handle_delay_kpi_fields(workbook)
+    # 当前只输出“店铺每日登记”，店铺日度关键/KPI 延迟统计处理先保留为注释。
+    # _handle_delay_chat_volume(workbook, summary)
+    # _handle_delay_kpi_fields(workbook)
     autosize_workbook(workbook)
     _apply_sheet_column_widths(workbook)
     apply_standard_table_style(workbook)
@@ -985,7 +1009,7 @@ def main() -> int:
     parser.add_argument("--user", default=os.environ.get("USER", "remote_user"))
     parser.add_argument("--password", default=os.environ.get("PASS", "Tourism2024"))
     parser.add_argument("--database", default=os.environ.get("DATABASE", "Xiangwang"))
-    parser.add_argument("--all-date-tables", action="store_true", help="Export every table with a recognized date column.")
+    parser.add_argument("--all-date-tables", action="store_true", help="Export every non-disabled table with a recognized date column.")
     parser.add_argument("--include-empty-tables", action="store_true", help="Also create sheets for tables with no rows on the selected date.")
     args = parser.parse_args()
 

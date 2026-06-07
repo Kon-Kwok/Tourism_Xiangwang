@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import sqlite3
+import subprocess
+import sys
 from dataclasses import dataclass
 from hashlib import pbkdf2_hmac
 from pathlib import Path
@@ -56,7 +58,7 @@ def build_chrome_session() -> requests.Session:
     db_version = _read_cookie_db_version(CHROME_COOKIE_DB)
     host_hash_len = 32 if db_version >= 24 else 0
     chrome_secret = _read_chrome_safe_storage_secret()
-    key = pbkdf2_hmac("sha1", chrome_secret.encode("utf-8"), b"saltysalt", 1, 16)
+    key = pbkdf2_hmac("sha1", chrome_secret.encode("utf-8"), b"saltysalt", _key_derivation_iterations(), 16)
 
     conn = sqlite3.connect(f"file:{CHROME_COOKIE_DB}?mode=ro", uri=True)
     try:
@@ -103,12 +105,25 @@ def _read_cookie_db_version(cookie_db: Path) -> int:
 
 
 def _read_chrome_safe_storage_secret() -> str:
+    if sys.platform == "darwin":
+        result = subprocess.run(
+            ["security", "find-generic-password", "-w", "-s", CHROME_SAFE_STORAGE_LABEL],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout.rstrip("\n")
+
     bus = secretstorage.dbus_init()
     collection = secretstorage.get_default_collection(bus)
     for item in collection.get_all_items():
         if item.get_label() == CHROME_SAFE_STORAGE_LABEL:
             return item.get_secret().decode("utf-8")
     raise RuntimeError(f"Secret Service item not found: {CHROME_SAFE_STORAGE_LABEL}")
+
+
+def _key_derivation_iterations() -> int:
+    return 1003 if sys.platform == "darwin" else 1
 
 
 def _decrypt_cookie_value(*, encrypted_value: bytes, key: bytes, host_hash_len: int) -> str:

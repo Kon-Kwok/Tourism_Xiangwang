@@ -55,3 +55,7 @@ chrome-user-data/
 # Codex / Playwright local artifacts
 .codex
 .playwright-cli/
+
+#中间过程结果
+logs
+exports/daily_database_2026-06-01_shop_registration.xlsx
