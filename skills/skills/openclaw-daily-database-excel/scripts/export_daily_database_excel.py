@@ -549,13 +549,31 @@ def _monthly_period_for_date(ref_date: date) -> tuple[date, date, str]:
     return start, end, label
 
 
-def _previous_period(start: date) -> tuple[date, date, str]:
-    prev_end = start - timedelta(days=1)
-    if start == date(start.year, 1, 1):
-        return date(start.year - 1, 11, 21), date(start.year - 1, 12, 31), "11月21号-12月31号"
-    if start.day == 21:
-        return date(start.year, start.month - 1, 21), date(start.year, start.month, 20), f"{start.month - 1}月21号-{start.month}月20号"
-    return date(start.year, start.month - 1, 21), date(start.year, start.month, 20), f"{start.month - 1}月21号-{start.month}月20号"
+def _find_earliest_alimama_date(cursor, database: str) -> date | None:
+    """Find the earliest date_time across all 4 Alimama channel tables."""
+    earliest = None
+    for table in ALIMAMA_TABLE_MAP.values():
+        cursor.execute(f"SELECT MIN(date_time) FROM `{database}`.`{table}`")
+        row = cursor.fetchone()
+        if row and row[0]:
+            d = row[0]
+            if isinstance(d, datetime):
+                d = d.date()
+            if earliest is None or d < earliest:
+                earliest = d
+    return earliest
+
+
+def _generate_monthly_periods(earliest_date: date, ref_date: date) -> list[tuple[date, date, str]]:
+    """Generate all monthly periods from earliest_date to ref_date (oldest first)."""
+    periods = []
+    current_start, current_end, current_label = _monthly_period_for_date(earliest_date)
+    max_periods = 60
+    while current_start <= ref_date and len(periods) < max_periods:
+        periods.append((current_start, current_end, current_label))
+        next_date = current_end + timedelta(days=1)
+        current_start, current_end, current_label = _monthly_period_for_date(next_date)
+    return periods
 
 
 def _parse_alimama_number(value) -> float:
@@ -603,12 +621,20 @@ def _fetch_alimama_aggregate(cursor, database: str, channel_tables: list[str], s
 
 def build_alimama_monthly_sheet(workbook, conn, args, biz_date_str: str, used_names: set[str]) -> None:
     biz_date = datetime.strptime(biz_date_str, "%Y-%m-%d").date()
-    period_start, period_end, period_label = _monthly_period_for_date(biz_date)
-    prev_start, prev_end, _ = _previous_period(period_start)
 
     with conn.cursor() as cursor:
-        current_data = _fetch_alimama_aggregate(cursor, args.database, list(ALIMAMA_TABLE_MAP.values()), period_start, period_end)
-        previous_data = _fetch_alimama_aggregate(cursor, args.database, list(ALIMAMA_TABLE_MAP.values()), prev_start, prev_end)
+        earliest_date = _find_earliest_alimama_date(cursor, args.database)
+
+    if earliest_date is None:
+        earliest_date = biz_date
+
+    periods = _generate_monthly_periods(earliest_date, biz_date)
+
+    with conn.cursor() as cursor:
+        all_period_data = []
+        for p_start, p_end, p_label in periods:
+            data = _fetch_alimama_aggregate(cursor, args.database, list(ALIMAMA_TABLE_MAP.values()), p_start, p_end)
+            all_period_data.append((p_label, data))
 
     sheet_name = safe_sheet_name("阿里妈妈月汇总", used_names)
     ws = workbook.create_sheet(sheet_name)
@@ -619,10 +645,9 @@ def build_alimama_monthly_sheet(workbook, conn, args, biz_date_str: str, used_na
         "CTR", "CPC", "CPM", "ROI", "CVR",
         "ASP", "订单成本", "加购成本",
     ]
-    ws.append(headers)
 
-    def write_period_block(label: str, data: dict, prev_data: dict | None = None):
-        ws.append([label] + [""] * (len(headers) - 1))
+    def write_period_block(label: str, data: dict):
+        ws.append([label] + list(headers[1:]))
         block_start = ws.max_row + 1
         for channel in ALIMAMA_CHANNELS:
             d = data.get(channel, {})
@@ -638,37 +663,34 @@ def build_alimama_monthly_sheet(workbook, conn, args, biz_date_str: str, used_na
             ws.append([
                 channel, cost, imp, click, order, sales,
                 cart, bp, bs,
-                f"=D{row_num}/C{row_num}",          # CTR
-                f"=B{row_num}/D{row_num}",          # CPC
-                f"=(B{row_num}/C{row_num})*1000",    # CPM
-                f"=F{row_num}/B{row_num}",          # ROI
-                f"=E{row_num}/D{row_num}",          # CVR
-                f"=IF(E{row_num}=0,0,F{row_num}/E{row_num})",  # ASP
-                f"=IF(E{row_num}=0,0,B{row_num}/E{row_num})",  # 订单成本
-                f"=B{row_num}/G{row_num}",          # 加购成本
+                f"=D{row_num}/C{row_num}",
+                f"=B{row_num}/D{row_num}",
+                f"=(B{row_num}/C{row_num})*1000",
+                f"=F{row_num}/B{row_num}",
+                f"=E{row_num}/D{row_num}",
+                f"=IF(E{row_num}=0,0,F{row_num}/E{row_num})",
+                f"=IF(E{row_num}=0,0,B{row_num}/E{row_num})",
+                f"=B{row_num}/G{row_num}",
             ])
 
         total_row = ws.max_row + 1
         ws.append(["总计"] + [f"=SUM({chr(65+c)}{block_start}:{chr(65+c)}{total_row-1})" for c in range(1, 9)] + [""] * 8)
-        ws.cell(total_row, 10).value = f"=D{total_row}/C{total_row}"  # CTR
-        ws.cell(total_row, 11).value = f"=B{total_row}/D{total_row}"  # CPC
-        ws.cell(total_row, 12).value = f"=(B{total_row}/C{total_row})*1000"  # CPM
-        ws.cell(total_row, 13).value = f"=F{total_row}/B{total_row}"  # ROI
-        ws.cell(total_row, 14).value = f"=E{total_row}/D{total_row}"  # CVR
-        ws.cell(total_row, 15).value = f"=IF(E{total_row}=0,0,F{total_row}/E{total_row})"  # ASP
-        ws.cell(total_row, 16).value = f"=IF(E{total_row}=0,0,B{total_row}/E{total_row})"  # 订单成本
-        ws.cell(total_row, 17).value = f"=B{total_row}/G{total_row}"  # 加购成本
+        ws.cell(total_row, 10).value = f"=D{total_row}/C{total_row}"
+        ws.cell(total_row, 11).value = f"=B{total_row}/D{total_row}"
+        ws.cell(total_row, 12).value = f"=(B{total_row}/C{total_row})*1000"
+        ws.cell(total_row, 13).value = f"=F{total_row}/B{total_row}"
+        ws.cell(total_row, 14).value = f"=E{total_row}/D{total_row}"
+        ws.cell(total_row, 15).value = f"=IF(E{total_row}=0,0,F{total_row}/E{total_row})"
+        ws.cell(total_row, 16).value = f"=IF(E{total_row}=0,0,B{total_row}/E{total_row})"
+        ws.cell(total_row, 17).value = f"=B{total_row}/G{total_row}"
 
-        return block_start, total_row
+    for i, (label, data) in enumerate(reversed(all_period_data)):
+        if i > 0:
+            for _ in range(3):
+                ws.append([])  # blank rows between periods
+        write_period_block(label, data)
 
-    write_period_block(period_label, current_data)
-    _, prev_total = write_period_block(f"{prev_start.month}月{prev_start.day}号-{prev_end.month}月{prev_end.day}号", previous_data)
-
-    # Hide the previous period rows
-    for row in range(prev_total - len(ALIMAMA_CHANNELS) - 1, prev_total + 1):
-        ws.row_dimensions[row].hidden = True
-
-    ws.freeze_panes = "B3"
+    ws.freeze_panes = "B2"
 
 
 def _apply_monthly_summary_formats(workbook) -> None:
@@ -821,6 +843,20 @@ def apply_standard_table_style(workbook) -> None:
                 cell.font = header_font
                 cell.alignment = header_alignment
             worksheet.row_dimensions[1].height = 41.4
+        # Style per-period label/header rows in 阿里妈妈月汇总
+        if worksheet.title == "阿里妈妈月汇总":
+            worksheet.column_dimensions['A'].width = 16.36
+            for row in worksheet.iter_rows(min_row=2, max_row=worksheet.max_row):
+                a_val = row[0].value
+                b_val = row[1].value if len(row) > 1 else None
+                is_period_header = (a_val and isinstance(a_val, str) and b_val == "花费"
+                                    and any(kw in str(a_val) for kw in ("月", "号")))
+                if is_period_header:
+                    for cell in row:
+                        cell.fill = header_fill
+                        cell.font = header_font
+                        cell.alignment = header_alignment
+                    worksheet.row_dimensions[row[0].row].height = 40.5
         # Style row 2 as sub-header for sheets with merged headers
         if worksheet.title == "店铺日度关键数据" and worksheet.max_row >= 2:
             for col_idx in range(1, worksheet.max_column + 1):
