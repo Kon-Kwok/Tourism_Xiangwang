@@ -512,17 +512,28 @@ def _apply_date_reformat(workbook) -> None:
 #
 #
 def _apply_shop_daily_reg_thousand_sep(workbook) -> None:
-    """Apply thousand separator to B-G columns of 店铺每日登记."""
+    """Apply thousand separator to integer numeric columns of 店铺每日登记.
+
+    Column layout (0-indexed):
+      0(A)=日期 1(B)=PV 2(C)=UV 3(D)=PaidUV 4(E)=关注店铺人数
+      5(F)=GMV 6(G)=咨询人数 7(H)=咨询转化率 8(I)=下单买家数 9(J)=下单转化率
+    GMV (col 5) uses #,##0.00; cols 7,9 (转化率) formatted separately as %.
+    Cols B-G+I are integer.
+    """
     for worksheet in workbook.worksheets:
         if worksheet.title != "店铺每日登记":
             continue
         for row in worksheet.iter_rows(min_row=2):
-            for col_idx in range(1, 7):
+            for col_idx in (1, 2, 3, 4, 5, 6, 8):
                 if col_idx >= len(row):
                     continue
                 cell = row[col_idx]
-                if cell.value is not None and isinstance(cell.value, (int, float)):
-                    cell.number_format = '#,##0'
+                if cell.value is None or not isinstance(cell.value, (int, float)):
+                    continue
+                if col_idx == 5:
+                    cell.number_format = '#,##0.00'   # GMV: two decimal places
+                else:
+                    cell.number_format = '#,##0'       # integer columns
 
 
 def _apply_col_range_formats(workbook) -> None:

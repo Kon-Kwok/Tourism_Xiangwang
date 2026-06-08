@@ -52,7 +52,7 @@ echo ""
 # WHERE 日期='${DATE}';
 # SQL
 
-echo -e "${YELLOW}▶ [1/4] 流量来源汇总${NC}"
+echo -e "${YELLOW}▶ [1/3] 流量来源汇总${NC}"
 ${MYSQL_EXEC} 2>/dev/null <<SQL
 UPDATE shop_daily_key_data
 SET 流量来源汇总 = 流量来源广告_uv + 流量来源平台_uv
@@ -73,7 +73,7 @@ echo -e "  ${GREEN}✓ 流量来源汇总计算完成${NC}"
 # WHERE 日期='${DATE}';
 # SQL
 
-echo -e "${YELLOW}▶ [2/4] shop_daily_key_data → shop_data_daily_registration${NC}"
+echo -e "${YELLOW}▶ [2/3] shop_daily_key_data → shop_data_daily_registration${NC}"
 ${MYSQL_EXEC} 2>/dev/null <<SQL
 UPDATE shop_data_daily_registration dr,
        (SELECT total_pv, total_uv, gmv, 流量来源汇总, total_bookings
@@ -84,15 +84,17 @@ WHERE dr.日期='${DATE}';
 SQL
 echo -e "  ${GREEN}✓ 5 个字段复制完成${NC}"
 
-echo -e "${YELLOW}▶ [3/4] KPI咨询人数汇总 → 店铺每日登记.咨询人数${NC}"
-${MYSQL_EXEC} 2>/dev/null <<SQL
-UPDATE shop_data_daily_registration dr,
-       (SELECT SUM(咨询人数) AS total FROM customer_service_performance_summary WHERE date_time='${DATE}') src
-SET dr.咨询人数 = src.total WHERE dr.日期='${DATE}';
-SQL
-echo -e "  ${GREEN}✓ 咨询人数写入完成${NC}"
+	# 赤兔KPI → customer_service_performance_summary → 咨询人数 已停用。
+	# 咨询人数现由 sycm_service.sh 直接从 SYCM 服务页面写入 shop_data_daily_registration。
+# echo -e "${YELLOW}▶ [3/4] KPI咨询人数汇总 → 店铺每日登记.咨询人数${NC}"
+# ${MYSQL_EXEC} 2>/dev/null <<SQL
+# UPDATE shop_data_daily_registration dr,
+#        (SELECT SUM(咨询人数) AS total FROM customer_service_performance_summary WHERE date_time='${DATE}') src
+# SET dr.咨询人数 = src.total WHERE dr.日期='${DATE}';
+# SQL
+# echo -e "  ${GREEN}✓ 咨询人数写入完成${NC}"
 
-echo -e "${YELLOW}▶ [4/4] 咨询转化率 & 下单转化率${NC}"
+echo -e "${YELLOW}▶ [3/3] 咨询转化率 & 下单转化率${NC}"
 ${MYSQL_EXEC} 2>/dev/null <<SQL
 UPDATE shop_data_daily_registration
 SET 咨询转化率 = CASE WHEN 咨询人数 > 0 THEN 下单买家数 / 咨询人数 ELSE NULL END,

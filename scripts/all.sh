@@ -23,10 +23,15 @@ echo -e "${NC}"
 # 记录开始时间
 START_TIME=$(date +%s)
 
-# 数据源1: 赤兔KPI三个报表，用于补齐 店铺每日登记.咨询人数
-echo -e "${BLUE}[$(date +%H:%M:%S)] 数据源1：赤兔KPI三个报表${NC}"
-"$SCRIPT_DIR/kpi_reports.sh" "$DATE"
-echo ""
+	# 数据源1: 赤兔KPI三个报表（已停用：客户未订购赤兔平台，咨询人数改从 SYCM 服务页面采集）
+# echo -e "${BLUE}[$(date +%H:%M:%S)] 数据源1：赤兔KPI三个报表${NC}"
+# "$SCRIPT_DIR/kpi_reports.sh" "$DATE"
+# echo ""
+
+	# 数据源1: SYCM服务核心监控，用于补齐 店铺每日登记.咨询人数
+	echo -e "${BLUE}[$(date +%H:%M:%S)] 数据源1：SYCM服务核心监控（咨询人数）${NC}"
+	"$SCRIPT_DIR/sycm_service.sh" "$DATE"
+	echo ""
 
 # 数据源2: 飞猪订单列表，用于补齐 店铺每日登记.GMV / 下单买家数
 echo -e "${BLUE}[$(date +%H:%M:%S)] 数据源2：飞猪订单列表${NC}"

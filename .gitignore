@@ -60,3 +60,7 @@ chrome-user-data/
 logs
 exports/daily_database_2026-06-01_shop_registration.xlsx
 exports/daily_database_2026-06-03_shop_registration.xlsx
+skills/skills/openclaw-daily-database-excel/scripts/export_daily_database_excel.py
+.gitignore
+exports/daily_database_2026-06-04_2026-06-07.xlsx
+exports/daily_database_2026-06-07_shop_registration.xlsx
