@@ -690,7 +690,7 @@ def build_alimama_monthly_sheet(workbook, conn, args, biz_date_str: str, used_na
                 ws.append([])  # blank rows between periods
         write_period_block(label, data)
 
-    ws.freeze_panes = "B2"
+    ws.freeze_panes = None
 
 
 def _apply_monthly_summary_formats(workbook) -> None:
