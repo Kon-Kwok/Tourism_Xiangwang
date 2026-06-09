@@ -11,7 +11,7 @@ REFRESH_INTERVAL="${CHROME_REFRESH_INTERVAL_SECONDS:-1800}"
 REFRESH_INITIAL_DELAY="${CHROME_REFRESH_INITIAL_DELAY_SECONDS:-1800}"
 REFRESH_LOG="${CHROME_REFRESH_LOG:-/tmp/chrome_refresh.log}"
 REFRESH_PID_FILE="${CHROME_REFRESH_PID_FILE:-/tmp/chrome_refresh_${DEBUG_PORT}.pid}"
-REFRESH_DOMAINS="${CHROME_REFRESH_DOMAINS:-sycm.taobao.com,fsc.fliggy.com,kf.topchitu.com,brandsearch.taobao.com,branding.taobao.com,one.alimama.com}"
+REFRESH_DOMAINS="${CHROME_REFRESH_DOMAINS:-sycm.taobao.com,fsc.fliggy.com,sell.fliggy.com}"
 CHROME_VERIFY_STABLE_DELAY_SECONDS="${CHROME_VERIFY_STABLE_DELAY_SECONDS:-2}"
 
 find_chrome_binary() {
@@ -137,7 +137,8 @@ else
     START_URLS=(
         "https://sycm.taobao.com/portal/home.htm"
         "https://fsc.fliggy.com/#/new/home"
-        "https://kf.topchitu.com/web/custom-kpi/employee-kpi?id=1721&wwt=ALL"
+        "https://sell.fliggy.com/#/orderlist/index.htm"
+        # 赤兔KPI（kf.topchitu.com）已停用，客户未订购。
         # 阿里妈妈投放采集当前停用，恢复时再打开以下登录页。
         # "https://one.alimama.com/index.html"
         # "https://branding.taobao.com/index.action"
@@ -233,11 +234,11 @@ for i in {1..15}; do
         echo "  - 所有登录都在这个Chrome中"
         echo "  - 支持CDP数据采集"
         echo "  - 登录状态永久保存"
-        echo "  - 已打开当前需要的登录页：SYCM、飞猪、赤兔"
+        echo "  - 已打开当前需要的登录页：SYCM、飞猪"
         echo "  - 已启用业务标签页自动刷新，默认每30分钟刷新一次"
         echo ""
         echo "现在可以："
-        echo "  1. 登录 SYCM、飞猪、赤兔"
+        echo "  1. 登录 SYCM、飞猪"
         echo "  2. 采集店铺每日登记数据"
         echo ""
         echo "采集数据命令示例："
