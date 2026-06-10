@@ -34,6 +34,7 @@ CHROME_COOKIE_HOST_KEYS = (
     "fsc.fliggy.com",
     "sell.fliggy.com",
     "seller.fliggy.com",
+    "hotel.fliggy.com",
 )
 
 

@@ -137,7 +137,8 @@ else
     START_URLS=(
         "https://sycm.taobao.com/portal/home.htm"
         "https://fsc.fliggy.com/#/new/home"
-        "https://sell.fliggy.com/#/orderlist/index.htm"
+        # sell.fliggy.com 未登录时跳转淘宝错误页，不需要直接打开；
+        # 其 cookie 已通过 .fliggy.com 域共享，由 fsc.fliggy.com 登录即可覆盖。
         # 赤兔KPI（kf.topchitu.com）已停用，客户未订购。
         # 阿里妈妈投放采集当前停用，恢复时再打开以下登录页。
         # "https://one.alimama.com/index.html"
@@ -234,7 +235,7 @@ for i in {1..15}; do
         echo "  - 所有登录都在这个Chrome中"
         echo "  - 支持CDP数据采集"
         echo "  - 登录状态永久保存"
-        echo "  - 已打开当前需要的登录页：SYCM、飞猪"
+        echo "  - 已打开当前需要的登录页：SYCM、飞猪FSC"
         echo "  - 已启用业务标签页自动刷新，默认每30分钟刷新一次"
         echo ""
         echo "现在可以："
@@ -242,7 +243,7 @@ for i in {1..15}; do
         echo "  2. 采集店铺每日登记数据"
         echo ""
         echo "采集数据命令示例："
-        echo "  PATH=\"/opt/homebrew/opt/coreutils/libexec/gnubin:\$PATH\" ./scripts/all.sh 2026-06-03"
+        echo "  ./scripts/all.sh 2026-06-03"
         echo ""
         echo "管理Chrome："
         echo "  查看日志: tail -f /tmp/chrome_debug.log"

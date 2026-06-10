@@ -15,7 +15,7 @@ import pymysql
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[5]
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_TABLES = (
     # 当前报表只输出“店铺每日登记”；恢复多表导出时取消下列注释。
     # ("customer_service_data_daily", "日期", "赤兔-人均日接入"),
@@ -132,7 +132,7 @@ def load_env() -> None:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+        os.environ[key.strip()] = value.strip().strip('"').strip("'")
 
 
 def parse_date(value: str | None) -> str:

@@ -1,11 +1,11 @@
 ---
 name: openclaw-daily-data-collection
-description: OpenClaw 侧采集并补齐 Xiangwang 店铺每日登记数据；当前保留 SYCM 服务核心监控（咨询人数）、飞猪订单、SYCM 流量作为必要数据源，赤兔 KPI 和阿里妈妈投放采集已停用。
+description: OpenClaw 侧采集并补齐 Xiangwang 店铺每日登记数据；当前保留 SYCM 服务核心监控（咨询人数）、飞猪订单、新 GMV 采集（日历房+度假订单）、SYCM 流量作为必要数据源，赤兔 KPI 和阿里妈妈投放采集已停用。
 ---
 
 # OpenClaw 每日数据采集技能
 
-调用项目根目录的 `scripts/all.sh` 完成"店铺每日登记"数据采集。当前流程保留 SYCM 服务核心监控（咨询人数）、飞猪订单、SYCM 流量看板作为必要数据源，赤兔 KPI 和阿里妈妈投放日报已停用（保留为注释）。
+调用项目根目录的 `scripts/all.sh` 完成"店铺每日登记"数据采集。当前流程保留 SYCM 服务核心监控（咨询人数）、飞猪订单、新 GMV 采集（日历房+度假订单）、SYCM 流量看板作为必要数据源，赤兔 KPI 和阿里妈妈投放日报已停用（保留为注释）。
 
 ## 快速开始
 
@@ -25,7 +25,8 @@ cd ~/Tourism_Xiangwang
 
 ```bash
 ./scripts/sycm_service.sh 2026-05-01    # 咨询人数（SYCM 服务核心监控）
-./scripts/fliggy_orders.sh 2026-05-01    # GMV / 下单买家数（飞猪订单）
+./scripts/fliggy_orders.sh 2026-05-01    # 下单买家数（飞猪订单列表）
+./scripts/gmv_combined.sh 2026-05-01     # GMV（链路1 日历房 + 链路2 度假订单）
 ./scripts/sycm_flow.sh 2026-05-01       # PV / UV / PaidUV / 关注店铺人数
 # ./scripts/kpi_reports.sh 2026-05-01    # 赤兔KPI（已停用）
 # ./scripts/alimama_daily.sh 2026-05-01  # 阿里妈妈（已停用）
@@ -57,6 +58,7 @@ PASS=your_mysql_password
 |---|---|---|
 | SYCM 服务核心监控（咨询人数） | `Xiangwang.shop_data_daily_registration`（直接写入） | ✅ 当前 |
 | 飞猪订单列表 | `Xiangwang.order_list`、`Xiangwang.shop_daily_key_data` | ✅ 当前 |
+| 新 GMV 采集（双链路） | `Xiangwang.shop_daily_key_data`（gmv 字段） | ✅ 当前 |
 | SYCM 流量看板 | `Xiangwang.shop_daily_key_data`、`Xiangwang.shop_data_daily_registration` | ✅ 当前 |
 | 赤兔 KPI 客服报表 | `Xiangwang.customer_service_data_daily`、`Xiangwang.customer_service_performance_summary`、`Xiangwang.customer_service_performance_workload_analysis` | 🚫 已停用 |
 | 阿里妈妈投放日报 | `Xiangwang.star_store`、`Xiangwang.tmall_express`、`Xiangwang.gravity_rubiks_cube`、`Xiangwang.wanxiangtai`、`Xiangwang.wanxiangtai_2` | 🚫 已停用 |
@@ -74,7 +76,7 @@ PASS=your_mysql_password
 | UV | SYCM 流量监控 | `total_uv` |
 | PaidUV | SYCM 店铺来源 | `流量来源广告_uv` + `流量来源平台_uv` |
 | 关注店铺人数 | SYCM 流量监控 | 直接写入 |
-| GMV | 飞猪订单 | `sum(actual_fee)`（暂时，待改为报表下载） |
+| GMV | 新 GMV（双链路） | 链路1(日历房 `checkOutRoomPrice`) + 链路2(度假订单导出 `总金额`，排除付款时间空白) |
 | 咨询人数 | SYCM 服务核心监控 | API `cstUv1d` 直接写入 |
 | 咨询转化率 | 计算 | `下单买家数 / 咨询人数` |
 | 下单买家数 | 飞猪订单 | `total_bookings` |
@@ -94,9 +96,15 @@ PASS=your_mysql_password
 
 - 必须带 `--all-pages`。
 - 订单明细进入 `Xiangwang.order_list`。
-- 订单汇总必须先经过 `bin/prepare_order_list_for_storage.py`，再由 `bin/prepare_shop_daily_key_sql.py` 写入 `total_bookings`、`total_pax`、`gmv`。
-- `gmv` 按 `actual_fee` 汇总；补差/尾款类订单只计入 `gmv`，不计入舱位和人数。
-- ⚠️ GMV 来源待切换为：飞猪商家后台 → 商品中心 → 已卖出的宝贝 → 下载报表 → 读取"买家应付货款"、剔除付款时间为空的订单。
+- 订单汇总必须先经过 `bin/prepare_order_list_for_storage.py`，再由 `bin/prepare_shop_daily_key_sql.py` 写入 `total_bookings`、`total_pax`。
+- `gmv` 现由 `gmv_combined.sh` 独立采集（双链路），`fliggy_orders.sh` 不再负责 GMV 计算。
+
+### 新 GMV（双链路）
+
+- **链路1 日历房**：调用 `hotel.fliggy.com/ota/reactjs/order_search.htm`，分页加总 `checkOutRoomPrice`
+- **链路2 度假订单**：触发报表导出 → 轮询下载 → 解析 `.xls` → 排除 `付款时间` 为空白 → 加总 `总金额`
+- 总 GMV = 链路1 + 链路2，写入 `shop_daily_key_data.gmv`
+- 脚本：`bin/prepare_gmv_combined_to_json.py` → `bin/prepare_gmv_combined_sql.py`
 
 ### 阿里妈妈投放（已停用）
 
@@ -165,12 +173,17 @@ one.alimama 场景接口：`https://one.alimama.com/report/query.json`
    - API 读取 cstUv1d → 直接写入 shop_data_daily_registration
    ↓
 2. 飞猪订单列表采集
-   - HTTP采集（--all-pages）→ 预处理 → 订单明细入库 → 订单汇总入库
+   - HTTP采集（--all-pages）→ 预处理 → 订单明细入库 → 订单汇总入库（下单买家数）
    ↓
-3. SYCM 流量看板采集
+3. 新 GMV 采集（日历房 + 度假订单）
+   - 链路1: hotel.fliggy.com 日历房分页加总 checkOutRoomPrice
+   - 链路2: sell.fliggy.com 度假订单导出 → 下载 .xls → 排除付款时间空白 → 加总总金额
+   - 写入 shop_daily_key_data.gmv
+   ↓
+4. SYCM 流量看板采集
    - HTTP采集 → 转换SQL（含关注店铺人数）→ 入库
    ↓
-4. 跨表规则应用（补齐店铺每日登记字段）
+5. 跨表规则应用（补齐店铺每日登记字段）
    - 流量来源汇总
    - shop_daily_key_data → shop_data_daily_registration
    - 转化率计算
@@ -264,22 +277,22 @@ WHERE 日期 = @biz_date;
 
 ## 性能指标
 
-### 当前版本（v4）
+### 当前版本（v5）
 
-- **总耗时**：约 1.5-2 分钟（去掉赤兔后大幅缩短）
+- **总耗时**：约 2.5-3.5 分钟（含度假订单导出轮询等待）
 - **SYCM 服务核心监控**：约 5 秒（单 API 调用）
 - **飞猪订单**：约 30 秒
+- **新 GMV 采集**：约 30-60 秒（链路1 日历房分页 + 链路2 导出触发/轮询/下载/解析）
 - **SYCM 流量**：约 20 秒
 - **跨表规则**：<1 秒
 
-### v3 → v4 改进
+### v4 → v5 改进
 
-| 项目 | v3 | v4 |
+| 项目 | v4 | v5 |
 |------|----|----|
-| 赤兔 KPI | 3 个报表，约 2 分钟 | 已停用 |
-| 咨询人数来源 | 赤兔 → customer_service_performance_summary → SUM | SYCM 服务 API → 直接写入 shop_data_daily_registration |
-| 数据源数量 | 4（赤兔+飞猪+SYCM+阿里妈妈） | 3（SYCM服务+飞猪+SYCM流量） |
-| 总耗时 | 3-4 分钟 | 1.5-2 分钟 |
+| GMV 来源 | 飞猪订单 `actual_fee` 汇总 | 双链路（日历房 `checkOutRoomPrice` + 度假订单导出 `总金额`，排除付款时间空白） |
+| GMV 采集脚本 | `fliggy_orders.sh` 内置 | `gmv_combined.sh` 独立脚本 |
+| 数据源数量 | 3（SYCM服务+飞猪+SYCM流量） | 4（SYCM服务+飞猪+新GMV+SYCM流量） |
 
 ## 版本历史
 
@@ -287,10 +300,11 @@ WHERE 日期 = @biz_date;
 - **v2** - 新增阿里妈妈投放日报、KPI改为API直读、新增数据库Excel导出技能、公共函数库、.env配置加载
 - **v3** - 新增跨表规则应用脚本（8条规则），自动补齐 shop_daily_key_data 和 shop_data_daily_registration 的衍生字段；新增数据管理规范
 - **v4** - 停用赤兔 KPI（客户未订购），咨询人数改为从 SYCM 服务核心监控 API 直接采集；新增 `sycm_service.sh` 和 `prepare_sycm_service_to_json.py`；更新执行流程、验证 SQL 和性能指标
+- **v5** - GMV 改为双链路采集（链路1 日历房 `checkOutRoomPrice` + 链路2 度假订单导出 `总金额`，排除付款时间空白）；新增 `gmv_combined.sh`、`bin/prepare_gmv_combined_to_json.py`、`bin/prepare_gmv_combined_sql.py`；GMV 不再由 `fliggy_orders.sh` 计算
 
 ---
 
 **技能名称**: openclaw-daily-data-collection
-**技能版本**: v4
-**最后更新**: 2026-06-08
+**技能版本**: v5
+**最后更新**: 2026-06-10
 **状态**: ✅ 生产就绪

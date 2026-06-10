@@ -26,18 +26,32 @@ resolve_date_argument() {
   local input_date="${1:-}"
   local resolved_date="${input_date}"
 
+  # macOS/Linux 兼容：macOS 用 date -j，Linux 用 date -d
+  _date_to_ymd() {
+    local d="$1"
+    if date -d "$d" +%F >/dev/null 2>&1; then
+      date -d "$d" +%F
+    else
+      date -j -f "%Y-%m-%d" "$d" +%F 2>/dev/null || echo ""
+    fi
+  }
+
   if [ -z "$resolved_date" ]; then
-    resolved_date="$(date -d "yesterday" +%F)"
+    if date -d "yesterday" +%F >/dev/null 2>&1; then
+      resolved_date="$(date -d "yesterday" +%F)"
+    else
+      resolved_date="$(date -v-1d +%F)"
+    fi
   fi
 
-  if ! date -d "$resolved_date" +%F >/dev/null 2>&1; then
+  if [ -z "$(_date_to_ymd "$resolved_date")" ]; then
     echo -e "${RED}错误：日期格式不正确${NC}"
     echo "使用：$0 YYYY-MM-DD"
     echo "示例：$0 2026-04-30"
     exit 1
   fi
 
-  if [ "$(date -d "$resolved_date" +%F)" != "$resolved_date" ]; then
+  if [ "$(_date_to_ymd "$resolved_date")" != "$resolved_date" ]; then
     echo -e "${RED}错误：日期格式不正确${NC}"
     echo "使用：$0 YYYY-MM-DD"
     echo "示例：$0 2026-04-30"

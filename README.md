@@ -13,8 +13,8 @@
 | `UV` | 流量数据 |
 | `PaidUV` | 广告流量 UV + 平台流量 UV |
 | `关注店铺人数` | 流量数据 |
-| `GMV` | 订单数据 |
-| `咨询人数` | 客服咨询数据 |
+| `GMV` | 链路1（日历房 checkOutRoomPrice）+ 链路2（度假订单导出 总金额，排除付款时间空白） |
+| `咨询人数` | SYCM 服务核心监控 API `cstUv1d` |
 | `咨询转化率` | `下单买家数 / 咨询人数` |
 | `下单买家数` | 订单数据 |
 | `下单转化率` | `下单买家数 / UV` |
@@ -36,29 +36,22 @@ cd /Users/dc/Desktop/Tourism_Xiangwang
 在 Chrome 中完成当前任务所需页面登录后，采集并入库：
 
 ```bash
-PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH" ./scripts/all.sh 2026-06-03
+./scripts/all.sh 2026-06-03
 ```
 
 不传日期时默认采集昨天：
 
 ```bash
-PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH" ./scripts/all.sh
+./scripts/all.sh
 ```
 
 导出 Excel：
 
 ```bash
-./.venv/bin/python3 skills/skills/openclaw-daily-database-excel/scripts/export_daily_database_excel.py \
-  --date 2026-06-03 \
-  --output exports/daily_database_2026-06-03_shop_registration.xlsx \
-  --host 127.0.0.1 \
-  --port 3306 \
-  --user <mysql_user> \
-  --password <mysql_password> \
-  --database Xiangwang
+./.venv/bin/python3 skills/skills/openclaw-daily-database-excel/scripts/export_daily_database_excel.py --date 2026-06-03
 ```
 
-macOS 自带 `date` 不支持 GNU `-d` 参数，采集命令前面的 `PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"` 用来优先使用 Homebrew coreutils。Linux 环境通常可以不加这段。
+数据库连接自动读取项目根目录 `.env`，无需在命令行传凭据。
 
 ## 数据库配置
 
@@ -86,9 +79,17 @@ DATABASE=Xiangwang
 
 | 表 | 作用 |
 | --- | --- |
-| `customer_service_performance_summary` | 提供 `咨询人数` |
 | `order_list` | 保存订单明细 |
 | `shop_daily_key_data` | 汇总订单和流量数据，供最终表补齐字段 |
+
+已停用表（赤兔 KPI、阿里妈妈投放，保留为注释）：
+
+| 表 | 状态 |
+| --- | --- |
+| `customer_service_data_daily` | 🚫 赤兔 KPI-人均日接入 |
+| `customer_service_performance_summary` | 🚫 赤兔 KPI-每周店铺个人数据 |
+| `customer_service_performance_workload_analysis` | 🚫 赤兔 KPI-客服数据23年新 |
+| `star_store` / `tmall_express` / `gravity_rubiks_cube` / `wanxiangtai` / `wanxiangtai_2` | 🚫 阿里妈妈投放日报 |
 
 ## 验证
 
@@ -127,8 +128,23 @@ tests/                    # unittest 测试
 exports/                  # Excel 导出文件
 ```
 
+## 采集流程
+
+`scripts/all.sh` 按顺序执行以下步骤：
+
+| 步骤 | 脚本 | 采集内容 |
+| --- | --- | --- |
+| 1 | `sycm_service.sh` | 咨询人数（SYCM 服务核心监控 API → shop_data_daily_registration） |
+| 2 | `fliggy_orders.sh` | 下单买家数（飞猪订单列表 → order_list / shop_daily_key_data） |
+| 3 | `gmv_combined.sh` | GMV（链路1 日历房 + 链路2 度假订单导出 → shop_daily_key_data.gmv） |
+| 4 | `sycm_flow.sh` | PV / UV / PaidUV / 关注店铺人数（SYCM 流量看板） |
+| 5 | `apply_cross_table_rules.sh` | 跨表规则补齐最终表（流量汇总、字段复制、转化率计算） |
+
 ## 注意事项
 
 - 订单采集必须覆盖全部分页，`scripts/fliggy_orders.sh` 已带 `--all-pages`。
+- GMV 由 `gmv_combined.sh` 独立采集（双链路），不再从 `fliggy_orders.sh` 的 `actual_fee` 计算。
+- 度假订单导出为 `.xls` 格式，依赖 `xlrd` 库解析；导出轮询最多 15 次（每次间隔 2 秒）。
 - `shop_daily_key_data` 的 `日期` 索引可能非唯一，写入保持 `UPDATE` 后 `INSERT ... WHERE NOT EXISTS`。
+- macOS/Linux `date` 兼容性已由 `scripts/lib/common.sh` 自动处理，无需额外配置 PATH。
 - 不要提交 cookies、本地 Chrome profile、数据库 dump 或真实密钥。
