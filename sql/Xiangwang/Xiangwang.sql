@@ -252,6 +252,25 @@ CREATE TABLE `wanxiangtai` (
 ) ENGINE=InnoDB AUTO_INCREMENT=36 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='万相台';
 
 
+CREATE TABLE IF NOT EXISTS `order_list_secondary` (
+  `id`            BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `order_id`      VARCHAR(50) NOT NULL COMMENT '订单编号',
+  `item_title`    VARCHAR(500) DEFAULT NULL COMMENT '商品标题',
+  `buy_mount`     INT DEFAULT NULL COMMENT '数量',
+  `room_capacity` INT DEFAULT NULL COMMENT '房型标注人数',
+  `pax`           INT DEFAULT NULL COMMENT 'PAX = buy_mount（即飞猪 API 的 pcount，代表实际旅客人数）',
+  `status_text`   VARCHAR(50) DEFAULT NULL COMMENT '订单状态',
+  `deal_time`     DATETIME DEFAULT NULL COMMENT '成交时间',
+  `submit_time`   DATETIME DEFAULT NULL COMMENT '提交时间',
+  `travel_date`   DATE DEFAULT NULL COMMENT '出行日期',
+  `price`         DECIMAL(10,2) DEFAULT NULL COMMENT '价格',
+  `created_at`    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_order_id` (`order_id`),
+  KEY `idx_submit_time` (`submit_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='飞猪二次预约订单数据';
+
+
 CREATE TABLE `wanxiangtai_2` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `date_time` date NOT NULL COMMENT '日期',

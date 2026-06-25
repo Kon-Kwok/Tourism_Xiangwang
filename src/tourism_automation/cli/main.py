@@ -12,6 +12,7 @@ from tourism_automation.collectors.fliggy_kpi.shop_kpi.cli import register_subpa
 from tourism_automation.collectors.fliggy_order_list.cli import register_subparser as register_fliggy_order_list_subparser
 from tourism_automation.collectors.fliggy_star_store.cli import register_subparser as register_fliggy_star_store_subparser
 from tourism_automation.collectors.sycm.cli import register_subparser as register_sycm_subparser
+from tourism_automation.collectors.fliggy_secondary_order.cli import register_subparser as register_fliggy_secondary_order_subparser
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -25,6 +26,7 @@ def build_parser() -> argparse.ArgumentParser:
     register_fliggy_order_list_subparser(subparsers)
     register_fliggy_star_store_subparser(subparsers)
     register_shop_kpi_export(subparsers)
+    register_fliggy_secondary_order_subparser(subparsers)
 
     return parser
 

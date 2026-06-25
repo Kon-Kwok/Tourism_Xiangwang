@@ -16,7 +16,7 @@ import pymysql
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[5]
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_TABLES = (
     ("customer_service_data_daily", "日期", "赤兔-人均日接入"),
     ("customer_service_performance_summary", "date_time", "赤兔-每周店铺个人数据"),
@@ -1043,7 +1043,7 @@ def main() -> int:
     parser.add_argument("--output", help="Output xlsx path. Defaults to exports/daily_database_YYYY-MM-DD.xlsx")
     parser.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", "3306")))
-    parser.add_argument("--user", default=os.environ.get("USER", "remote_user"))
+    parser.add_argument("--user", default=os.environ.get("DB_USER") or os.environ.get("USER", "remote_user"))
     parser.add_argument("--password", default=os.environ.get("PASS", "Tourism2024"))
     parser.add_argument("--database", default=os.environ.get("DATABASE", "Xiangwang"))
     parser.add_argument("--all-date-tables", action="store_true", help="Export every table with a recognized date column.")
