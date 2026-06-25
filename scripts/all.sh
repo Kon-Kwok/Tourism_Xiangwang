@@ -48,6 +48,11 @@ echo -e "${BLUE}[$(date +%H:%M:%S)] 业务5：跨表规则应用${NC}"
 "$SCRIPT_DIR/apply_cross_table_rules.sh" "$DATE"
 echo ""
 
+# 业务6: 赤兔团队看板采集
+echo -e "${BLUE}[$(date +%H:%M:%S)] 业务6：赤兔团队看板采集${NC}"
+"$SCRIPT_DIR/team_dashboard.sh" "$DATE"
+echo ""
+
 # 计算耗时
 END_TIME=$(date +%s)
 ELAPSED=$((END_TIME - START_TIME))

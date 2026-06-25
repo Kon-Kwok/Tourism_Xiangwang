@@ -393,6 +393,56 @@ def fill_cs_data_section(ws, cursor, biz_date: str):
         _write_pct_cell(ws.cell(row=9, column=col), vs_yest)
         _write_pct_cell(ws.cell(row=10, column=col), vs_lw)
 
+    # Columns D-E: 首响/平响 from team_dashboard_daily (inverted: lower=faster=greener)
+    first_today = _get_team_dashboard_metric(cursor, "first_response_sec", biz_date)
+    first_yest = _get_team_dashboard_metric(cursor, "first_response_sec", yesterday)
+    first_lw = _get_team_dashboard_metric(cursor, "first_response_sec", lw_date)
+
+    avg_today = _get_team_dashboard_metric(cursor, "avg_response_sec", biz_date)
+    avg_yest = _get_team_dashboard_metric(cursor, "avg_response_sec", yesterday)
+    avg_lw = _get_team_dashboard_metric(cursor, "avg_response_sec", lw_date)
+
+    resp_metrics = [
+        (4, first_today, first_yest, first_lw),  # D: 首响
+        (5, avg_today, avg_yest, avg_lw),          # E: 平响
+    ]
+    for col, today_val, yest_val, lw_val in resp_metrics:
+        vs_yest = today_val / yest_val if (today_val and yest_val) else None
+        vs_lw = today_val / lw_val if (today_val and lw_val) else None
+        _write_response_pct_cell(ws.cell(row=9, column=col), vs_yest)
+        _write_response_pct_cell(ws.cell(row=10, column=col), vs_lw)
+
+
+def _get_team_dashboard_metric(cursor, column: str, biz_date: str) -> float | None:
+    """Get a metric from team_dashboard_daily. Returns None if no data."""
+    cursor.execute(
+        f"SELECT `{column}` FROM Xiangwang.team_dashboard_daily WHERE date_time = %s",
+        (biz_date,),
+    )
+    row = cursor.fetchone()
+    if row and row[0]:
+        val = float(row[0])
+        return val if val > 0 else None
+    return None
+
+
+def _write_response_pct_cell(cell, value: float | None):
+    """Write a percentage cell for response time. Lower=faster=greener (inverted)."""
+    cell.number_format = '0%'
+    if value is None:
+        cell.value = None
+        cell.font = BLACK_FONT
+    else:
+        cell.value = value
+        if value < 1.0:
+            cell.font = Font(name="等线", size=11, color="FF008000")  # faster
+        elif value > 1.0:
+            cell.font = Font(name="等线", size=11, color="FFFF0000")  # slower
+        else:
+            cell.font = Font(name="等线", size=11, color="FF000000")
+    cell.alignment = Alignment(vertical="center")
+    _apply_border(cell)
+
 
 def fill_monthly_actual_rows(ws, cursor):
     """Fill Row 25 (实际消耗) and Row 26 (转化单量) from alimama monthly aggregation."""
@@ -422,6 +472,45 @@ def fill_monthly_actual_rows(ws, cursor):
 
         ws[f"{col_letter}25"] = total_cost if total_cost else None
         ws[f"{col_letter}26"] = int(total_orders) if total_orders else None
+
+
+# SKU keywords to exclude per SOP
+_PAX_EXCLUDE_KEYWORDS = [
+    "补差", "尾款", "升级", "升房", "升舱", "税费", "补税",
+    "改期", "改航线", "生日礼遇", "通兑",
+]
+_PAX_EXCLUDE_STATUSES = ("交易关闭", "等待买家付款")
+
+
+def fill_yearly_pax_step1(ws, cursor):
+    """Fill C30:C41 with step 1 monthly PAX from order_list (Phase 2B step 1)."""
+    for month_num in range(1, 13):
+        m_start = f"2026-{month_num:02d}-01"
+        if month_num == 12:
+            m_end = "2026-12-31"
+        else:
+            m_end = f"2026-{month_num+1:02d}-01"
+
+        conditions = " AND ".join(
+            [f"item_title NOT LIKE '%%%%{kw}%%%%'" for kw in _PAX_EXCLUDE_KEYWORDS]
+        )
+        cursor.execute(
+            f"SELECT COALESCE(SUM(buy_mount), 0) FROM Xiangwang.order_list "
+            f"WHERE order_date >= %s AND order_date < %s "
+            f"AND status_text NOT IN {_PAX_EXCLUDE_STATUSES} "
+            f"AND ({conditions})",
+            (m_start, m_end),
+        )
+        row = cursor.fetchone()
+        pax = int(row[0]) if row and row[0] else 0
+
+        r = 30 + month_num - 1
+        if pax > 0:
+            ws.cell(row=r, column=3).value = pax
+            ws.cell(row=r, column=3).font = NORMAL_FONT
+            ws.cell(row=r, column=3).number_format = '#,##0'
+            ws.cell(row=r, column=3).alignment = Alignment(vertical="center")
+            _apply_border(ws.cell(row=r, column=3))
 
 
 def fill_mtd_ytd_section(ws, cursor, biz_date: str):
