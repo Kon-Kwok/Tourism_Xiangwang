@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import os
 import re
+import sys
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -994,6 +996,26 @@ def build_workbook(conn, args, biz_date: str, start_date: str = None, end_date: 
 
     build_alimama_monthly_sheet(workbook, conn, args, biz_date or end_date, used_sheet_names)
     build_alimama_budget_sheet(workbook, conn, args.database, biz_date, start_date, end_date, used_sheet_names)
+
+    # --- 店铺关键数据完成情况 sheet ---
+    try:
+        kpi_module_path = Path(__file__).resolve().parents[4] / "scripts" / "fill_shop_kpi_sheet.py"
+        spec = importlib.util.spec_from_file_location("fill_shop_kpi_sheet", kpi_module_path)
+        kpi = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(kpi)
+
+        kpi_ws = workbook.create_sheet(title=kpi.SHEET_NAME)
+        kpi.build_sheet_structure(kpi_ws)
+        with conn.cursor() as cur2:
+            latest = kpi.get_latest_date(cur2) or biz_date or end_date
+            kpi_ws["B1"] = latest
+            kpi_ws["B1"].font = Font(name="等线", size=11)
+            kpi.fill_shop_data_section(kpi_ws, cur2, latest)
+            kpi.fill_cs_data_section(kpi_ws, cur2, latest)
+            kpi.fill_monthly_actual_rows(kpi_ws, cur2)
+            kpi.fill_mtd_ytd_section(kpi_ws, cur2, latest)
+    except Exception as e:
+        print(f"Warning: failed to build shop KPI sheet: {e}")
 
     _apply_cell_formats(workbook)
     _apply_date_reformat(workbook)
