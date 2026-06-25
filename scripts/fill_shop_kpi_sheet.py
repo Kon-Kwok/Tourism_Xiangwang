@@ -244,3 +244,223 @@ def _set_header_cell(cell, text: str, wrap: bool = False):
 def _apply_border(cell):
     """Apply thin border to a cell."""
     cell.border = THIN_BORDER
+
+
+# ---- Task 3: Database query functions ----
+
+def get_latest_date(cursor) -> str | None:
+    """Find the latest date across all daily tables."""
+    cursor.execute("""
+        SELECT MAX(d) FROM (
+            SELECT MAX(日期) AS d FROM Xiangwang.shop_daily_key_data
+            UNION SELECT MAX(日期) FROM Xiangwang.shop_data_daily_registration
+            UNION SELECT MAX(date_time) FROM Xiangwang.customer_service_performance_summary
+        ) t
+    """)
+    row = cursor.fetchone()
+    return str(row[0]) if row and row[0] else None
+
+
+def get_shop_metric_today(cursor, table: str, column: str, date_col: str, biz_date: str) -> float:
+    """Get a single metric value for a given date."""
+    cursor.execute(
+        f"SELECT COALESCE(`{column}`, 0) FROM Xiangwang.`{table}` WHERE `{date_col}` = %s",
+        (biz_date,),
+    )
+    row = cursor.fetchone()
+    return float(row[0]) if row and row[0] else 0.0
+
+
+def get_shop_metric_sum(cursor, table: str, column: str, date_col: str, biz_date: str) -> float:
+    """Get SUM of a column for a given date (for multi-row tables like customer_service)."""
+    cursor.execute(
+        f"SELECT COALESCE(SUM(`{column}`), 0) FROM Xiangwang.`{table}` WHERE `{date_col}` = %s",
+        (biz_date,),
+    )
+    row = cursor.fetchone()
+    return float(row[0]) if row and row[0] else 0.0
+
+
+def get_alimama_sum(cursor, column: str, biz_date: str) -> float:
+    """Sum a column across the 4 alimama channel tables for a given date."""
+    tables = ["star_store", "tmall_express", "gravity_rubiks_cube", "wanxiangtai"]
+    total = 0.0
+    for tbl in tables:
+        cursor.execute(
+            f"SELECT `{column}` FROM Xiangwang.`{tbl}` WHERE date_time = %s",
+            (biz_date,),
+        )
+        row = cursor.fetchone()
+        if row and row[0] is not None:
+            total += parse_money(row[0])
+    return total
+
+
+def _write_pct_cell(cell, value: float | None):
+    """Write a percentage cell with green/red/black conditional color."""
+    cell.number_format = '0%'
+    if value is None:
+        cell.value = None
+        cell.font = BLACK_FONT
+    else:
+        cell.value = value
+        if value > 1.0:
+            cell.font = Font(name="等线", size=11, color="FF008000")
+        elif value < 1.0:
+            cell.font = Font(name="等线", size=11, color="FFFF0000")
+        else:
+            cell.font = Font(name="等线", size=11, color="FF000000")
+    cell.alignment = Alignment(vertical="center")
+    _apply_border(cell)
+
+
+def fill_shop_data_section(ws, cursor, biz_date: str):
+    """Fill Rows 5-6 (VS Yesterday / VS LW) for B-G columns."""
+    yesterday = str(date.fromisoformat(biz_date) - timedelta(days=1))
+    lw_date = str(date.fromisoformat(biz_date) - timedelta(days=7))
+
+    uv_today = get_shop_metric_today(cursor, "shop_data_daily_registration", "UV", "日期", biz_date)
+    uv_yest = get_shop_metric_today(cursor, "shop_data_daily_registration", "UV", "日期", yesterday)
+    uv_lw = get_shop_metric_today(cursor, "shop_data_daily_registration", "UV", "日期", lw_date)
+
+    paid_uv_today = get_shop_metric_today(cursor, "shop_data_daily_registration", "PaidUV", "日期", biz_date)
+    paid_uv_yest = get_shop_metric_today(cursor, "shop_data_daily_registration", "PaidUV", "日期", yesterday)
+    paid_uv_lw = get_shop_metric_today(cursor, "shop_data_daily_registration", "PaidUV", "日期", lw_date)
+
+    cost_today = get_shop_metric_today(cursor, "shop_daily_key_data", "cost_total", "日期", biz_date)
+    cost_yest = get_shop_metric_today(cursor, "shop_daily_key_data", "cost_total", "日期", yesterday)
+    cost_lw = get_shop_metric_today(cursor, "shop_daily_key_data", "cost_total", "日期", lw_date)
+
+    bk_today = get_shop_metric_today(cursor, "shop_daily_key_data", "total_bookings", "日期", biz_date)
+    bk_yest = get_shop_metric_today(cursor, "shop_daily_key_data", "total_bookings", "日期", yesterday)
+    bk_lw = get_shop_metric_today(cursor, "shop_daily_key_data", "total_bookings", "日期", lw_date)
+
+    paid_bk_today = get_alimama_sum(cursor, "order_count", biz_date)
+    paid_bk_yest = get_alimama_sum(cursor, "order_count", yesterday)
+    paid_bk_lw = get_alimama_sum(cursor, "order_count", lw_date)
+
+    sales_today = get_alimama_sum(cursor, "sales", biz_date)
+    sales_yest = get_alimama_sum(cursor, "sales", yesterday)
+    sales_lw = get_alimama_sum(cursor, "sales", lw_date)
+    roi_today = sales_today / cost_today if cost_today else 0
+    roi_yest = sales_yest / cost_yest if cost_yest else 0
+    roi_lw = sales_lw / cost_lw if cost_lw else 0
+
+    metrics = [
+        (2, uv_today, uv_yest, uv_lw),
+        (3, paid_uv_today, paid_uv_yest, paid_uv_lw),
+        (4, cost_today, cost_yest, cost_lw),
+        (5, bk_today, bk_yest, bk_lw),
+        (6, paid_bk_today, paid_bk_yest, paid_bk_lw),
+        (7, roi_today, roi_yest, roi_lw),
+    ]
+
+    for col, today_val, yest_val, lw_val in metrics:
+        vs_yest = today_val / yest_val if yest_val else None
+        vs_lw = today_val / lw_val if lw_val else None
+        _write_pct_cell(ws.cell(row=5, column=col), vs_yest)
+        _write_pct_cell(ws.cell(row=6, column=col), vs_lw)
+
+
+# ---- Task 4: CS data + monthly actual + MTD/YTD ----
+
+def fill_cs_data_section(ws, cursor, biz_date: str):
+    """Fill Rows 9-10 (VS Yesterday / VS LW) for 客服数据 B,C,F columns. D,E left empty for Phase 2."""
+    yesterday = str(date.fromisoformat(biz_date) - timedelta(days=1))
+    lw_date = str(date.fromisoformat(biz_date) - timedelta(days=7))
+
+    zx_today = get_shop_metric_today(cursor, "shop_data_daily_registration", "咨询人数", "日期", biz_date)
+    zx_yest = get_shop_metric_today(cursor, "shop_data_daily_registration", "咨询人数", "日期", yesterday)
+    zx_lw = get_shop_metric_today(cursor, "shop_data_daily_registration", "咨询人数", "日期", lw_date)
+
+    jd_today = get_shop_metric_sum(cursor, "customer_service_performance_summary", "接待人数", "date_time", biz_date)
+    jd_yest = get_shop_metric_sum(cursor, "customer_service_performance_summary", "接待人数", "date_time", yesterday)
+    jd_lw = get_shop_metric_sum(cursor, "customer_service_performance_summary", "接待人数", "date_time", lw_date)
+
+    ord_today = get_shop_metric_sum(cursor, "customer_service_performance_summary", "订单数", "date_time", biz_date)
+    ord_yest = get_shop_metric_sum(cursor, "customer_service_performance_summary", "订单数", "date_time", yesterday)
+    ord_lw = get_shop_metric_sum(cursor, "customer_service_performance_summary", "订单数", "date_time", lw_date)
+
+    cs_metrics = [
+        (2, zx_today, zx_yest, zx_lw),
+        (3, jd_today, jd_yest, jd_lw),
+        (6, ord_today, ord_yest, ord_lw),
+    ]
+
+    for col, today_val, yest_val, lw_val in cs_metrics:
+        vs_yest = today_val / yest_val if yest_val else None
+        vs_lw = today_val / lw_val if lw_val else None
+        _write_pct_cell(ws.cell(row=9, column=col), vs_yest)
+        _write_pct_cell(ws.cell(row=10, column=col), vs_lw)
+
+
+def fill_monthly_actual_rows(ws, cursor):
+    """Fill Row 25 (实际消耗) and Row 26 (转化单量) from alimama monthly aggregation."""
+    tables = ["star_store", "tmall_express", "gravity_rubiks_cube", "wanxiangtai"]
+    month_cols = list("BCDEFGHIJKLM")
+
+    for i, col_letter in enumerate(month_cols):
+        month_num = i + 1
+        m_start = f"2026-{month_num:02d}-01"
+        if month_num == 12:
+            m_end = "2026-12-31"
+        else:
+            m_end = f"2026-{month_num+1:02d}-01"
+
+        total_cost = 0.0
+        total_orders = 0.0
+        for tbl in tables:
+            cursor.execute(
+                f"SELECT `cost`, `order_count` FROM Xiangwang.`{tbl}` "
+                f"WHERE date_time >= %s AND date_time < %s",
+                (m_start, m_end),
+            )
+            for row in cursor.fetchall():
+                if row:
+                    total_cost += parse_money(row[0])
+                    total_orders += float(row[1] if row[1] else 0)
+
+        ws[f"{col_letter}25"] = total_cost if total_cost else None
+        ws[f"{col_letter}26"] = int(total_orders) if total_orders else None
+
+
+def fill_mtd_ytd_section(ws, cursor, biz_date: str):
+    """Fill MTD (Row 13-16) and YTD (Row 18-19) with formulas referencing yearly table."""
+    d = date.fromisoformat(biz_date)
+    month_idx = d.month - 1
+    mtd_row = 30 + month_idx
+    month_col = list("BCDEFGHIJKLM")[month_idx]
+
+    ws["B13"] = f"=C{mtd_row}"
+    ws["B13"].font = NORMAL_FONT
+    ws["B13"].alignment = Alignment(vertical="center")
+    _apply_border(ws["B13"])
+
+    ws["B14"] = f"=D{mtd_row}"
+    ws["B14"].font = NORMAL_FONT
+    ws["B14"].number_format = '0%'
+    ws["B14"].alignment = Alignment(vertical="center")
+    _apply_border(ws["B14"])
+
+    ws["B15"] = f"={month_col}25"
+    ws["B15"].font = NORMAL_FONT
+    ws["B15"].number_format = '#,##0'
+    ws["B15"].alignment = Alignment(vertical="center")
+    _apply_border(ws["B15"])
+
+    ws["B16"] = f"={month_col}26"
+    ws["B16"].font = NORMAL_FONT
+    ws["B16"].alignment = Alignment(vertical="center")
+    _apply_border(ws["B16"])
+
+    ws["B18"] = "=C42"
+    ws["B18"].font = NORMAL_FONT
+    ws["B18"].number_format = '#,##0'
+    ws["B18"].alignment = Alignment(vertical="center")
+    _apply_border(ws["B18"])
+
+    ws["B19"] = "=D42"
+    ws["B19"].font = NORMAL_FONT
+    ws["B19"].number_format = '0%'
+    ws["B19"].alignment = Alignment(vertical="center")
+    _apply_border(ws["B19"])
