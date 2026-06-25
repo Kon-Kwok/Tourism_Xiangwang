@@ -482,8 +482,15 @@ _PAX_EXCLUDE_KEYWORDS = [
 _PAX_EXCLUDE_STATUSES = ("交易关闭", "等待买家付款")
 
 
-def fill_yearly_pax_step1(ws, cursor):
-    """Fill C30:C41 with step 1 monthly PAX from order_list (Phase 2B step 1)."""
+def _get_step1_pax(cursor) -> dict[int, int]:
+    """Query order_list for step 1 monthly PAX.
+
+    Returns dict {1: jan_pax, ..., 12: dec_pax}.
+    """
+    result: dict[int, int] = {}
+    conditions = " AND ".join(
+        [f"item_title NOT LIKE '%%%%{kw}%%%%'" for kw in _PAX_EXCLUDE_KEYWORDS]
+    )
     for month_num in range(1, 13):
         m_start = f"2026-{month_num:02d}-01"
         if month_num == 12:
@@ -491,9 +498,6 @@ def fill_yearly_pax_step1(ws, cursor):
         else:
             m_end = f"2026-{month_num+1:02d}-01"
 
-        conditions = " AND ".join(
-            [f"item_title NOT LIKE '%%%%{kw}%%%%'" for kw in _PAX_EXCLUDE_KEYWORDS]
-        )
         cursor.execute(
             f"SELECT COALESCE(SUM(buy_mount), 0) FROM Xiangwang.order_list "
             f"WHERE order_date >= %s AND order_date < %s "
@@ -502,11 +506,40 @@ def fill_yearly_pax_step1(ws, cursor):
             (m_start, m_end),
         )
         row = cursor.fetchone()
-        pax = int(row[0]) if row and row[0] else 0
+        result[month_num] = int(row[0]) if row and row[0] else 0
+    return result
 
+
+def _get_step2_pax(cursor) -> dict[int, int]:
+    """Query order_list_secondary for step 2 monthly PAX.
+
+    Returns dict {1: jan_pax, ..., 12: dec_pax}.
+    """
+    result: dict[int, int] = {m: 0 for m in range(1, 13)}
+    cursor.execute(
+        "SELECT MONTH(submit_time) AS m, COALESCE(SUM(pax), 0) "
+        "FROM Xiangwang.order_list_secondary "
+        "WHERE submit_time IS NOT NULL "
+        "AND YEAR(submit_time) = 2026 "
+        "GROUP BY MONTH(submit_time)"
+    )
+    for row in cursor.fetchall():
+        month_num = int(row[0])
+        pax = int(row[1])
+        result[month_num] = pax
+    return result
+
+
+def fill_yearly_pax_step1(ws, cursor):
+    """Fill C30:C41 with step 1 + step 2 combined monthly PAX."""
+    step1 = _get_step1_pax(cursor)
+    step2 = _get_step2_pax(cursor)
+
+    for month_num in range(1, 13):
+        total_pax = step1.get(month_num, 0) + step2.get(month_num, 0)
         r = 30 + month_num - 1
-        if pax > 0:
-            ws.cell(row=r, column=3).value = pax
+        if total_pax > 0:
+            ws.cell(row=r, column=3).value = total_pax
             ws.cell(row=r, column=3).font = NORMAL_FONT
             ws.cell(row=r, column=3).number_format = '#,##0'
             ws.cell(row=r, column=3).alignment = Alignment(vertical="center")

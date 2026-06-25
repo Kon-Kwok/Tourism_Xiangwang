@@ -22,25 +22,37 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # 日期参数规范化。未传参时默认使用昨天，和日报技能说明保持一致。
+# 同时兼容 GNU date (Linux) 和 BSD date (macOS)。
 resolve_date_argument() {
   local input_date="${1:-}"
   local resolved_date="${input_date}"
 
+  # 未传日期时：取昨天
   if [ -z "$resolved_date" ]; then
-    resolved_date="$(date -d "yesterday" +%F)"
+    if date -d "yesterday" +%F >/dev/null 2>&1; then
+      resolved_date="$(date -d "yesterday" +%F)"
+    else
+      resolved_date="$(date -j -v-1d +%F)"
+    fi
   fi
 
-  if ! date -d "$resolved_date" +%F >/dev/null 2>&1; then
-    echo -e "${RED}错误：日期格式不正确${NC}"
-    echo "使用：$0 YYYY-MM-DD"
-    echo "示例：$0 2026-04-30"
+  # 校验日期字符串：尝试用任一 date 实现格式化，若与输入一致则合法
+  local formatted
+  if date -d "$resolved_date" +%F >/dev/null 2>&1; then
+    formatted="$(date -d "$resolved_date" +%F)"
+  elif date -j -f "%Y-%m-%d" "$resolved_date" +%F >/dev/null 2>&1; then
+    formatted="$(date -j -f "%Y-%m-%d" "$resolved_date" +%F)"
+  else
+    echo -e "${RED}错误：日期格式不正确${NC}" >&2
+    echo "使用：$0 YYYY-MM-DD" >&2
+    echo "示例：$0 2026-04-30" >&2
     exit 1
   fi
 
-  if [ "$(date -d "$resolved_date" +%F)" != "$resolved_date" ]; then
-    echo -e "${RED}错误：日期格式不正确${NC}"
-    echo "使用：$0 YYYY-MM-DD"
-    echo "示例：$0 2026-04-30"
+  if [ "$formatted" != "$resolved_date" ]; then
+    echo -e "${RED}错误：日期格式不正确${NC}" >&2
+    echo "使用：$0 YYYY-MM-DD" >&2
+    echo "示例：$0 2026-04-30" >&2
     exit 1
   fi
 
