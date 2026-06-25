@@ -55,3 +55,8 @@ chrome-user-data/
 # Codex / Playwright local artifacts
 .codex
 .playwright-cli/
+
+
+# 本地运行生成的报表和日志
+exports/
+logs/
