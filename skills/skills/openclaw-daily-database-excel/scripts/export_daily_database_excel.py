@@ -833,6 +833,8 @@ def apply_standard_table_style(workbook) -> None:
     thin_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
 
     for worksheet in workbook.worksheets:
+        if worksheet.title == "店铺关键数据完成情况":
+            continue  # this sheet manages its own styling
         for row in worksheet.iter_rows():
             for cell in row:
                 cell.border = thin_border
