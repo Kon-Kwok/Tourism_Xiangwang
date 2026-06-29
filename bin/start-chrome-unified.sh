@@ -11,7 +11,7 @@ REFRESH_INTERVAL="${CHROME_REFRESH_INTERVAL_SECONDS:-1800}"
 REFRESH_INITIAL_DELAY="${CHROME_REFRESH_INITIAL_DELAY_SECONDS:-1800}"
 REFRESH_LOG="${CHROME_REFRESH_LOG:-/tmp/chrome_refresh.log}"
 REFRESH_PID_FILE="${CHROME_REFRESH_PID_FILE:-/tmp/chrome_refresh_${DEBUG_PORT}.pid}"
-REFRESH_DOMAINS="${CHROME_REFRESH_DOMAINS:-sycm.taobao.com,fsc.fliggy.com,kf.topchitu.com,brandsearch.taobao.com,branding.taobao.com,one.alimama.com}"
+REFRESH_DOMAINS="${CHROME_REFRESH_DOMAINS:-sycm.taobao.com,fsc.fliggy.com,kf.topchitu.com,brandsearch.taobao.com,branding.taobao.com,one.alimama.com,yuyue.fliggy.com}"
 
 stop_refresh_daemon() {
     local refresh_pid=""
@@ -75,6 +75,7 @@ else
         "https://kf.topchitu.com/web/custom-kpi/employee-kpi?id=1721&wwt=ALL"
         "https://one.alimama.com/index.html"
         "https://branding.taobao.com/index.action"
+        "https://yuyue.fliggy.com/travelbm/sell/bookInfoList.htm"
     )
 fi
 

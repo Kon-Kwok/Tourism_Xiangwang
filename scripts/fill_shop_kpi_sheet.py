@@ -45,6 +45,33 @@ MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
 
 NUMERIC_TEXT_RE = re.compile(r"^[¥￥]?([+-]?[\d,]+(?:\.\d*)?)$")
 
+# Fiscal month boundaries per SOP: each month = 21st of prev month to 20th of current
+# Used for alimama spend/orders (Row 25-26) and MTD alimama refs (Row 15-16)
+FISCAL_MONTH_BOUNDS: list[tuple[str, str]] = [
+    ("2026-01-01", "2026-01-21"),   # Jan:  1/1  - 1/20
+    ("2026-01-21", "2026-02-21"),   # Feb:  1/21 - 2/20
+    ("2026-02-21", "2026-03-21"),   # Mar:  2/21 - 3/20
+    ("2026-03-21", "2026-04-21"),   # Apr:  3/21 - 4/20
+    ("2026-04-21", "2026-05-21"),   # May:  4/21 - 5/20
+    ("2026-05-21", "2026-06-21"),   # Jun:  5/21 - 6/20
+    ("2026-06-21", "2026-07-21"),   # Jul:  6/21 - 7/20
+    ("2026-07-21", "2026-08-21"),   # Aug:  7/21 - 8/20
+    ("2026-08-21", "2026-09-21"),   # Sep:  8/21 - 9/20
+    ("2026-09-21", "2026-10-21"),   # Oct:  9/21 - 10/20
+    ("2026-10-21", "2026-11-21"),   # Nov:  10/21 - 11/20
+    ("2026-11-21", "2026-12-31"),   # Dec:  11/21 - 12/31
+]
+
+# Natural (calendar) month boundaries for PAX aggregation (Step1 + Step2)
+NATURAL_MONTH_BOUNDS: list[tuple[str, str]] = [
+    ("2026-01-01", "2026-02-01"), ("2026-02-01", "2026-03-01"),
+    ("2026-03-01", "2026-04-01"), ("2026-04-01", "2026-05-01"),
+    ("2026-05-01", "2026-06-01"), ("2026-06-01", "2026-07-01"),
+    ("2026-07-01", "2026-08-01"), ("2026-08-01", "2026-09-01"),
+    ("2026-09-01", "2026-10-01"), ("2026-10-01", "2026-11-01"),
+    ("2026-11-01", "2026-12-01"), ("2026-12-01", "2027-01-01"),
+]
+
 
 def parse_money(value: Any) -> float:
     """Parse '¥1,234.56' or 1234.56 or Decimal to float."""
@@ -297,16 +324,20 @@ def get_alimama_sum(cursor, column: str, biz_date: str) -> float:
 
 
 def _write_pct_cell(cell, value: float | None):
-    """Write a percentage cell with green/red/black conditional color."""
-    cell.number_format = '0%'
+    """Write a percentage cell with +/- sign and green/red color.
+
+    Stores (value - 1) so format '+0.00%;-0.00%' renders e.g. '+6.84%' or '-27.53%'.
+    """
+    cell.number_format = '+0.00%;-0.00%'
     if value is None:
         cell.value = None
         cell.font = BLACK_FONT
     else:
-        cell.value = value
-        if value > 1.0:
+        delta = value - 1.0
+        cell.value = delta
+        if delta > 0:
             cell.font = Font(name="等线", size=11, color="FF008000")
-        elif value < 1.0:
+        elif delta < 0:
             cell.font = Font(name="等线", size=11, color="FFFF0000")
         else:
             cell.font = Font(name="等线", size=11, color="FF000000")
@@ -427,16 +458,20 @@ def _get_team_dashboard_metric(cursor, column: str, biz_date: str) -> float | No
 
 
 def _write_response_pct_cell(cell, value: float | None):
-    """Write a percentage cell for response time. Lower=faster=greener (inverted)."""
-    cell.number_format = '0%'
+    """Write a percentage cell for response time with +/- sign, inverted color.
+
+    Lower = faster = green.  Stores delta from 1.0, uses '+0.00%;-0.00%' format.
+    """
+    cell.number_format = '+0.00%;-0.00%'
     if value is None:
         cell.value = None
         cell.font = BLACK_FONT
     else:
-        cell.value = value
-        if value < 1.0:
+        delta = value - 1.0
+        cell.value = delta
+        if delta < 0:
             cell.font = Font(name="等线", size=11, color="FF008000")  # faster
-        elif value > 1.0:
+        elif delta > 0:
             cell.font = Font(name="等线", size=11, color="FFFF0000")  # slower
         else:
             cell.font = Font(name="等线", size=11, color="FF000000")
@@ -450,12 +485,7 @@ def fill_monthly_actual_rows(ws, cursor):
     month_cols = list("BCDEFGHIJKLM")
 
     for i, col_letter in enumerate(month_cols):
-        month_num = i + 1
-        m_start = f"2026-{month_num:02d}-01"
-        if month_num == 12:
-            m_end = "2026-12-31"
-        else:
-            m_end = f"2026-{month_num+1:02d}-01"
+        m_start, m_end = FISCAL_MONTH_BOUNDS[i]
 
         total_cost = 0.0
         total_orders = 0.0
@@ -492,11 +522,7 @@ def _get_step1_pax(cursor) -> dict[int, int]:
         [f"item_title NOT LIKE '%%%%{kw}%%%%'" for kw in _PAX_EXCLUDE_KEYWORDS]
     )
     for month_num in range(1, 13):
-        m_start = f"2026-{month_num:02d}-01"
-        if month_num == 12:
-            m_end = "2026-12-31"
-        else:
-            m_end = f"2026-{month_num+1:02d}-01"
+        m_start, m_end = NATURAL_MONTH_BOUNDS[month_num - 1]
 
         cursor.execute(
             f"SELECT COALESCE(SUM(buy_mount), 0) FROM Xiangwang.order_list "
@@ -511,22 +537,20 @@ def _get_step1_pax(cursor) -> dict[int, int]:
 
 
 def _get_step2_pax(cursor) -> dict[int, int]:
-    """Query order_list_secondary for step 2 monthly PAX.
+    """Query order_list_secondary for step 2 monthly PAX (fiscal months).
 
     Returns dict {1: jan_pax, ..., 12: dec_pax}.
     """
     result: dict[int, int] = {m: 0 for m in range(1, 13)}
-    cursor.execute(
-        "SELECT MONTH(submit_time) AS m, COALESCE(SUM(pax), 0) "
-        "FROM Xiangwang.order_list_secondary "
-        "WHERE submit_time IS NOT NULL "
-        "AND YEAR(submit_time) = 2026 "
-        "GROUP BY MONTH(submit_time)"
-    )
-    for row in cursor.fetchall():
-        month_num = int(row[0])
-        pax = int(row[1])
-        result[month_num] = pax
+    for month_num in range(1, 13):
+        m_start, m_end = NATURAL_MONTH_BOUNDS[month_num - 1]
+        cursor.execute(
+            "SELECT COALESCE(SUM(pax), 0) FROM Xiangwang.order_list_secondary "
+            "WHERE submit_time >= %s AND submit_time < %s",
+            (m_start, m_end),
+        )
+        row = cursor.fetchone()
+        result[month_num] = int(row[0]) if row and row[0] else 0
     return result
 
 
@@ -546,31 +570,52 @@ def fill_yearly_pax_step1(ws, cursor):
             _apply_border(ws.cell(row=r, column=3))
 
 
-def fill_mtd_ytd_section(ws, cursor, biz_date: str):
-    """Fill MTD (Row 13-16) and YTD (Row 18-19) with formulas referencing yearly table."""
-    d = date.fromisoformat(biz_date)
-    month_idx = d.month - 1
-    mtd_row = 30 + month_idx
-    month_col = list("BCDEFGHIJKLM")[month_idx]
+def _fiscal_month_idx(biz_date_str: str) -> int:
+    """Return 0-based fiscal month index for a given date."""
+    d = date.fromisoformat(biz_date_str)
+    for i, (start_str, end_str) in enumerate(FISCAL_MONTH_BOUNDS):
+        start = date.fromisoformat(start_str)
+        end = date.fromisoformat(end_str)
+        if start <= d < end:
+            return i
+    return d.month - 1  # fallback to calendar month
 
-    ws["B13"] = f"=C{mtd_row}"
+
+def _natural_month_idx(biz_date_str: str) -> int:
+    """Return 0-based natural (calendar) month index."""
+    return date.fromisoformat(biz_date_str).month - 1
+
+
+def fill_mtd_ytd_section(ws, cursor, biz_date: str):
+    """Fill MTD (Row 13-16) and YTD (Row 18-19) with formulas.
+
+    Row 13-14 (PAX完成量/率): natural month index → C/D column
+    Row 15-16 (阿里妈妈消耗/转化): fiscal month index → Row 25/26
+    """
+    natural_idx = _natural_month_idx(biz_date)
+    fiscal_idx = _fiscal_month_idx(biz_date)
+    cols = list("BCDEFGHIJKLM")
+
+    # Row 13-14: natural month → PAX
+    ws["B13"] = f"=C{30 + natural_idx}"
     ws["B13"].font = NORMAL_FONT
     ws["B13"].alignment = Alignment(vertical="center")
     _apply_border(ws["B13"])
 
-    ws["B14"] = f"=D{mtd_row}"
+    ws["B14"] = f"=D{30 + natural_idx}"
     ws["B14"].font = NORMAL_FONT
     ws["B14"].number_format = '0%'
     ws["B14"].alignment = Alignment(vertical="center")
     _apply_border(ws["B14"])
 
-    ws["B15"] = f"={month_col}25"
+    # Row 15-16: fiscal month → alimama
+    ws["B15"] = f"={cols[fiscal_idx]}25"
     ws["B15"].font = NORMAL_FONT
     ws["B15"].number_format = '#,##0'
     ws["B15"].alignment = Alignment(vertical="center")
     _apply_border(ws["B15"])
 
-    ws["B16"] = f"={month_col}26"
+    ws["B16"] = f"={cols[fiscal_idx]}26"
     ws["B16"].font = NORMAL_FONT
     ws["B16"].alignment = Alignment(vertical="center")
     _apply_border(ws["B16"])

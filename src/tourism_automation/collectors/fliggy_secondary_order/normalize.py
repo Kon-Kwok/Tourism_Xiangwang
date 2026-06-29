@@ -106,8 +106,8 @@ def parse_xml(xml_text: str) -> tuple[list[dict], bool]:
         # Price
         price = _text(item, "price")
 
-        # PAX = pcount (pcount is the passenger count per order)
-        pax = buy_mount
+        # PAX = buy_mount × room_capacity per SOP
+        pax = buy_mount * (room_capacity or 1)
 
         orders.append({
             "order_id": tc_or_num,

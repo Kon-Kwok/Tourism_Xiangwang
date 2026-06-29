@@ -1009,7 +1009,7 @@ def build_workbook(conn, args, biz_date: str, start_date: str = None, end_date: 
         kpi_ws = workbook.create_sheet(title=kpi.SHEET_NAME)
         kpi.build_sheet_structure(kpi_ws)
         with conn.cursor() as cur2:
-            latest = kpi.get_latest_date(cur2) or biz_date or end_date
+            latest = biz_date or end_date or kpi.get_latest_date(cur2)
             kpi_ws["B1"] = latest
             kpi_ws["B1"].font = Font(name="等线", size=11)
             kpi.fill_shop_data_section(kpi_ws, cur2, latest)
