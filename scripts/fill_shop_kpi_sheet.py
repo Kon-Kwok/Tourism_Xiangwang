@@ -87,7 +87,7 @@ def parse_money(value: Any) -> float:
     return 0.0
 
 
-def build_sheet_structure(ws):
+def build_sheet_structure(ws, year: int = 2026):
     """Create the full template structure (labels, headers, merges, formatting)."""
     # --- Row 1: Date label ---
     ws["A1"] = "Date"
@@ -212,8 +212,8 @@ def build_sheet_structure(ws):
 
     # --- Rows 29-42: 年度完成情况表 ---
     ws["A29"] = "月份"
-    ws["B29"] = "2026\ntarget"
-    ws["C29"] = "2026\nActual"
+    ws["B29"] = f"{year}\ntarget"
+    ws["C29"] = f"{year}\nActual"
     ws["D29"] = "完成率"
     for ref in ("A29", "B29", "C29", "D29"):
         ws[ref].font = NORMAL_FONT

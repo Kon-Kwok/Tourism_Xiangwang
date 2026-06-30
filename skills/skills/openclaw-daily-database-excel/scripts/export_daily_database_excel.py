@@ -974,7 +974,7 @@ def build_shop_daily_key_sheet(workbook, conn, database: str, biz_date: str, use
     ws.freeze_panes = "A3"
 
 
-def build_workbook(conn, args, biz_date: str, start_date: str = None, end_date: str = None):
+def build_workbook(conn, args, biz_date: str, start_date: str = None, end_date: str = None, kpi_date: str = None):
     workbook = openpyxl.Workbook()
     workbook.remove(workbook.active)
     used_sheet_names: set[str] = set()
@@ -1007,9 +1007,10 @@ def build_workbook(conn, args, biz_date: str, start_date: str = None, end_date: 
         spec.loader.exec_module(kpi)
 
         kpi_ws = workbook.create_sheet(title=kpi.SHEET_NAME)
-        kpi.build_sheet_structure(kpi_ws)
         with conn.cursor() as cur2:
-            latest = biz_date or end_date or kpi.get_latest_date(cur2)
+            latest = kpi_date or biz_date or end_date or kpi.get_latest_date(cur2)
+            ref_year = int(latest[:4])
+            kpi.build_sheet_structure(kpi_ws, year=ref_year)
             kpi_ws["B1"] = latest
             kpi_ws["B1"].font = Font(name="等线", size=11)
             kpi.fill_shop_data_section(kpi_ws, cur2, latest)
@@ -1040,6 +1041,7 @@ def main() -> int:
     parser.add_argument("--date", help="Business date, format YYYY-MM-DD. Defaults to today.")
     parser.add_argument("--start", help="Start date for range export, format YYYY-MM-DD.")
     parser.add_argument("--end", help="End date for range export, format YYYY-MM-DD.")
+    parser.add_argument("--kpi-date", help="Reference date for KPI sheet VS comparisons. Defaults to --date or --end.")
     parser.add_argument("--output", help="Output xlsx path. Defaults to exports/daily_database_YYYY-MM-DD.xlsx")
     parser.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", "3306")))
@@ -1062,6 +1064,8 @@ def main() -> int:
         biz_date = parse_date(args.date)
         start_date = end_date = None
 
+    kpi_date = parse_date(args.kpi_date) if args.kpi_date else None
+
     if args.output:
         output_path = Path(args.output)
     elif range_mode:
@@ -1078,7 +1082,7 @@ def main() -> int:
         args.host = "127.0.0.1"
         conn = connect(args)
     try:
-        workbook, summary = build_workbook(conn, args, biz_date=biz_date, start_date=start_date, end_date=end_date)
+        workbook, summary = build_workbook(conn, args, biz_date=biz_date, start_date=start_date, end_date=end_date, kpi_date=kpi_date)
         workbook.save(output_path)
     finally:
         conn.close()
