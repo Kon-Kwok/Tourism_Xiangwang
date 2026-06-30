@@ -509,25 +509,48 @@ _PAX_EXCLUDE_KEYWORDS = [
     "补差", "尾款", "升级", "升房", "升舱", "税费", "补税",
     "改期", "改航线", "生日礼遇", "通兑",
 ]
+# SOP 要求排除的订单状态（NULL 状态不排除）
 _PAX_EXCLUDE_STATUSES = ("交易关闭", "等待买家付款")
+# 预编译 SQL 条件：避免 MySQL NOT IN 对 NULL 的陷阱
+_PAX_STATUS_CONDITION = (
+    "(status_text IS NULL OR "
+    + " AND ".join(f"status_text != '{s}'" for s in _PAX_EXCLUDE_STATUSES)
+    + ")"
+)
 
 
-def _get_step1_pax(cursor) -> dict[int, int]:
+def _get_step1_pax(cursor, as_of_date: str | None = None) -> dict[int, int]:
     """Query order_list for step 1 monthly PAX.
 
     Returns dict {1: jan_pax, ..., 12: dec_pax}.
+
+    SOP 规则：
+      - 按 order_date 自然月统计
+      - 已结束月份：完整自然月
+      - 最新月份（含 as_of_date）：[月初, as_of_date 次日 00:00)
+      - 排除 status_text = '交易关闭' / '等待买家付款'（NULL 状态不排除）
+      - 仅依据 SKU 字段（package_type）排除 11 个关键词
+      - PAX = SUM(buy_mount)
     """
     result: dict[int, int] = {}
+    # 按 SKU 字段（package_type）过滤，NULL/空 SKU 不排除
     conditions = " AND ".join(
-        [f"item_title NOT LIKE '%%%%{kw}%%%%'" for kw in _PAX_EXCLUDE_KEYWORDS]
+        [f"(package_type IS NULL OR package_type NOT LIKE '%%%%{kw}%%%%')"
+         for kw in _PAX_EXCLUDE_KEYWORDS]
     )
     for month_num in range(1, 13):
         m_start, m_end = NATURAL_MONTH_BOUNDS[month_num - 1]
 
+        # 截断当前月份：不统计晚于 as_of_date 的记录
+        if as_of_date:
+            cutoff = (date.fromisoformat(as_of_date) + timedelta(days=1)).isoformat()
+            if cutoff < m_end:
+                m_end = cutoff
+
         cursor.execute(
             f"SELECT COALESCE(SUM(buy_mount), 0) FROM Xiangwang.order_list "
             f"WHERE order_date >= %s AND order_date < %s "
-            f"AND status_text NOT IN {_PAX_EXCLUDE_STATUSES} "
+            f"AND {_PAX_STATUS_CONDITION} "
             f"AND ({conditions})",
             (m_start, m_end),
         )
@@ -536,17 +559,34 @@ def _get_step1_pax(cursor) -> dict[int, int]:
     return result
 
 
-def _get_step2_pax(cursor) -> dict[int, int]:
-    """Query order_list_secondary for step 2 monthly PAX (fiscal months).
+def _get_step2_pax(cursor, as_of_date: str | None = None) -> dict[int, int]:
+    """Query order_list_secondary for step 2 monthly PAX.
 
     Returns dict {1: jan_pax, ..., 12: dec_pax}.
+
+    SOP 规则：
+      - 按 submit_time 自然月统计
+      - 已结束月份：完整自然月
+      - 最新月份（含 as_of_date）：[月初, as_of_date 次日 00:00)
+      - 按订单编号去重（DB 层 uk_order_id 保证）
+      - 排除订单状态为 '商家已驳回'（NULL 状态不排除）
+      - PAX = SUM(pax)（pax = buy_mount × room_capacity）
     """
     result: dict[int, int] = {m: 0 for m in range(1, 13)}
     for month_num in range(1, 13):
         m_start, m_end = NATURAL_MONTH_BOUNDS[month_num - 1]
+
+        # 截断当前月份
+        if as_of_date:
+            cutoff = (date.fromisoformat(as_of_date) + timedelta(days=1)).isoformat()
+            if cutoff < m_end:
+                m_end = cutoff
+
         cursor.execute(
             "SELECT COALESCE(SUM(pax), 0) FROM Xiangwang.order_list_secondary "
-            "WHERE submit_time >= %s AND submit_time < %s",
+            "WHERE submit_time >= %s AND submit_time < %s "
+            "AND (status_text IS NULL OR status_text != '商家已驳回') "
+            "AND pax IS NOT NULL",
             (m_start, m_end),
         )
         row = cursor.fetchone()
@@ -554,10 +594,57 @@ def _get_step2_pax(cursor) -> dict[int, int]:
     return result
 
 
-def fill_yearly_pax_step1(ws, cursor):
-    """Fill C30:C41 with step 1 + step 2 combined monthly PAX."""
-    step1 = _get_step1_pax(cursor)
-    step2 = _get_step2_pax(cursor)
+def _print_pax_audit(cursor, step1: dict, step2: dict, as_of_date: str | None):
+    """输出月度 PAX 审计信息到 stderr，供人工核对。"""
+    import sys as _sys
+    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    _sys.stderr.write(f"\n{'='*60}\n")
+    _sys.stderr.write(f"PAX 审计 (as_of={as_of_date or '全月'})\n")
+    _sys.stderr.write(f"{'='*60}\n")
+    _sys.stderr.write(f"{'月':<6} {'Step1':>8} {'Step2':>8} {'合计':>8}\n")
+    _sys.stderr.write(f"{'-'*30}\n")
+    total_s1 = 0
+    total_s2 = 0
+    for m in range(1, 13):
+        s1 = step1.get(m, 0)
+        s2 = step2.get(m, 0)
+        total_s1 += s1
+        total_s2 += s2
+        _sys.stderr.write(f"{month_names[m-1]:<6} {s1:>8} {s2:>8} {s1+s2:>8}\n")
+    _sys.stderr.write(f"{'-'*30}\n")
+    _sys.stderr.write(f"{'总计':<6} {total_s1:>8} {total_s2:>8} {total_s1+total_s2:>8}\n")
+
+    # Step2 异常检查
+    cursor.execute(
+        "SELECT COUNT(*) FROM Xiangwang.order_list_secondary "
+        "WHERE pax IS NULL"
+    )
+    null_pax = cursor.fetchone()[0]
+    if null_pax:
+        _sys.stderr.write(f"\n⚠️  {null_pax} 条 order_list_secondary.pax IS NULL "
+                          f"(房型人数未解析)\n")
+
+    # Step2 驳回状态检查
+    cursor.execute(
+        "SELECT COUNT(*) FROM Xiangwang.order_list_secondary "
+        "WHERE status_text = '商家已驳回'"
+    )
+    rejected = cursor.fetchone()[0]
+    if rejected:
+        _sys.stderr.write(f"⚠️  {rejected} 条 order_list_secondary 状态为'商家已驳回' "
+                          f"(已被 Step2 PAX 排除)\n")
+    _sys.stderr.write(f"{'='*60}\n\n")
+
+
+def fill_yearly_pax_step1(ws, cursor, as_of_date: str | None = None):
+    """Fill C30:C41 with step 1 + step 2 combined monthly PAX.
+
+    Args:
+        as_of_date: 报表日期。当前月份统计截止到该日（不含之后）。
+    """
+    step1 = _get_step1_pax(cursor, as_of_date)
+    step2 = _get_step2_pax(cursor, as_of_date)
 
     for month_num in range(1, 13):
         total_pax = step1.get(month_num, 0) + step2.get(month_num, 0)
@@ -568,6 +655,9 @@ def fill_yearly_pax_step1(ws, cursor):
             ws.cell(row=r, column=3).number_format = '#,##0'
             ws.cell(row=r, column=3).alignment = Alignment(vertical="center")
             _apply_border(ws.cell(row=r, column=3))
+
+    # 月度审计输出
+    _print_pax_audit(cursor, step1, step2, as_of_date)
 
 
 def _fiscal_month_idx(biz_date_str: str) -> int:

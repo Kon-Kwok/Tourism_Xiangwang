@@ -18,10 +18,11 @@ CHINESE_ROOM_CAPACITY_PREFIXES = (
     ("六人", 6),
 )
 MONEY_CLEAN_PATTERN = re.compile(r"[^\d.\-]")
-# 非通兑订单排除关键词：仅在订单非通兑时才生效
+# SKU 字段排除关键词（严格按 SOP: 共 11 个）
+# SOP 要求：SKU 字段带有以下任一关键词的订单，均不计算 PAX
 PAX_BK_EXCLUDE_KEYWORDS = (
     "补差", "尾款", "升级", "升房", "升舱",
-    "税费", "补税", "改期", "改航线", "生日礼遇",
+    "税费", "补税", "改期", "改航线", "生日礼遇", "通兑",
 )
 
 
@@ -52,12 +53,14 @@ def _extract_room_capacity(package_type: str | None) -> int | None:
 
 
 def _should_skip_pax_bk(row: dict) -> bool:
-    """通兑/舱房订单永不算金额订单；仅非舱房订单检查排除关键词"""
-    package_type = row.get("package_type") or ""
-    if "通兑" in package_type:
+    """按 SOP：仅依据 SKU 字段（package_type）排除。
+
+    package_type 为 None/空时，不排除（无 SKU 可匹配）。
+    """
+    package_type = row.get("package_type")
+    if not package_type:
         return False
-    combined = f'{row.get("item_title") or ""} {package_type}'
-    return any(keyword in combined for keyword in PAX_BK_EXCLUDE_KEYWORDS)
+    return any(keyword in package_type for keyword in PAX_BK_EXCLUDE_KEYWORDS)
 
 
 def _decimal_to_json_number(value: Decimal):
@@ -85,18 +88,18 @@ def prepare_payload_for_storage(payload: dict) -> dict:
         if _should_skip_pax_bk(row):
             continue
 
+        # ——— PAX（严格按 SOP）：合格订单的 SUM(buy_mount) ———
+        total_pax += buy_mount
+
+        # ——— BK（预订间数）：沿用已有分场景逻辑 ———
         if is_universal and room_capacity:
-            total_pax += buy_mount * Decimal(room_capacity)
             total_booking += buy_mount
         elif room_capacity:
-            total_pax += buy_mount
             total_booking += buy_mount / Decimal(room_capacity)
         elif is_universal:
-            total_pax += buy_mount
             total_booking += buy_mount
         else:
             # 无房型普通订单：BK 固定为 1
-            total_pax += buy_mount
             total_booking += Decimal("1")
 
     summary = result.setdefault("summary", {})

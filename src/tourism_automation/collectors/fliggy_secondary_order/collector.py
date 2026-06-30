@@ -31,7 +31,7 @@ def _date_to_param_end(date_str: str) -> str:
 def collect_secondary_orders(
     start_date: str,
     end_date: str,
-) -> list[dict]:
+) -> tuple[list[dict], list[dict]]:
     """Collect all secondary booking orders for a date range.
 
     Args:
@@ -39,13 +39,16 @@ def collect_secondary_orders(
         end_date: End date, e.g. '2026-06-30'.
 
     Returns:
-        List of normalized order dicts.
+        (orders, exceptions) tuple:
+          orders: List of normalized order dicts.
+          exceptions: List of dicts for orders with unparseable room_capacity.
     """
     apply_start = _date_to_param(start_date)
     apply_end = _date_to_param_end(end_date)
 
     client = SecondaryOrderClient.from_local_chrome()
     all_orders: list[dict] = []
+    all_exceptions: list[dict] = []
     seen_ids: set[str] = set()
 
     for page_num in range(1, MAX_PAGES + 1):
@@ -55,7 +58,7 @@ def collect_secondary_orders(
             apply_end=apply_end,
         )
 
-        page_orders, has_next = parse_xml(html)
+        page_orders, has_next, page_exceptions = parse_xml(html)
 
         for order in page_orders:
             oid = order["order_id"]
@@ -63,10 +66,12 @@ def collect_secondary_orders(
                 seen_ids.add(oid)
                 all_orders.append(order)
 
+        all_exceptions.extend(page_exceptions)
+
         if not has_next:
             break
 
-    return all_orders
+    return all_orders, all_exceptions
 
 
 def _read_env() -> dict:
@@ -86,8 +91,10 @@ def _read_env() -> dict:
 def store_orders(orders: list[dict]) -> int:
     """Store orders into Xiangwang.order_list_secondary.
 
-    Uses DELETE + INSERT pattern matching the existing order_list pipeline.
-    Returns number of rows inserted.
+    Upsert pattern: ON DUPLICATE KEY UPDATE ensures status changes are propagated
+    (e.g. previously-valid → '商家已驳回').
+
+    Returns number of rows inserted/updated.
     """
     if not orders:
         return 0
@@ -116,10 +123,10 @@ def store_orders(orders: list[dict]) -> int:
                   `id`            BIGINT NOT NULL AUTO_INCREMENT,
                   `order_id`      VARCHAR(50) NOT NULL COMMENT '订单编号',
                   `item_title`    VARCHAR(500) DEFAULT NULL COMMENT '商品标题',
-                  `buy_mount`     INT DEFAULT NULL COMMENT '数量',
-                  `room_capacity` INT DEFAULT NULL COMMENT '房型标注人数',
-                  `pax`           INT DEFAULT NULL COMMENT 'PAX = buy_mount（即飞猪 API 的 pcount，代表实际旅客人数）',
-                  `status_text`   VARCHAR(50) DEFAULT NULL COMMENT '订单状态',
+                  `buy_mount`     INT DEFAULT NULL COMMENT '数量（I列）',
+                  `room_capacity` INT DEFAULT NULL COMMENT '房型标注人数（Q列）',
+                  `pax`           INT DEFAULT NULL COMMENT 'PAX = buy_mount × room_capacity',
+                  `status_text`   VARCHAR(50) DEFAULT NULL COMMENT '订单状态（K列）',
                   `deal_time`     DATETIME DEFAULT NULL COMMENT '成交时间',
                   `submit_time`   DATETIME DEFAULT NULL COMMENT '提交时间',
                   `travel_date`   DATE DEFAULT NULL COMMENT '出行日期',
@@ -132,7 +139,7 @@ def store_orders(orders: list[dict]) -> int:
                 COMMENT='飞猪二次预约订单数据'
             """)
 
-            # Upsert each order
+            # Upsert each order — updates status_text/pax on duplicate order_id
             inserted = 0
             for o in orders:
                 cur.execute(
@@ -184,25 +191,37 @@ def collect_and_store(
         output: Optional file path to write JSON result.
 
     Returns:
-        Summary dict with order_count and stored_count.
+        Summary dict with order_count, stored_count, and exceptions.
     """
-    orders = collect_secondary_orders(start_date, end_date)
+    orders, exceptions = collect_secondary_orders(start_date, end_date)
 
-    if output:
-        result = {
-            "summary": {
-                "order_count": len(orders),
-                "start_date": start_date,
-                "end_date": end_date,
-            },
-            "rows": orders,
-        }
-        with open(output, "w", encoding="utf-8") as f:
-            json.dump(result, f, ensure_ascii=False, indent=2)
+    # 房型人数解析异常：阻止 PAX 发布
+    if exceptions:
+        print(f"ERROR: {len(exceptions)} 条二次预约订单无法解析 Q 列房型人数，PAX 不可发布",
+              file=sys.stderr)
+        for exc in exceptions:
+            print(f"  order_id={exc['order_id']} sku={exc['raw_sku_items']} "
+                  f"buy_mount={exc['buy_mount']} status={exc['status_text']} "
+                  f"submit_time={exc['submit_time']}",
+                  file=sys.stderr)
+        print("请人工核实以上订单的 Q 列房型标注人数后重新采集。", file=sys.stderr)
 
     stored = store_orders(orders)
 
-    return {
+    result = {
         "order_count": len(orders),
         "stored_count": stored,
+        "exception_count": len(exceptions),
     }
+
+    if output:
+        import json as _json
+        payload = {
+            "summary": result,
+            "rows": orders,
+            "exceptions": exceptions,
+        }
+        with open(output, "w", encoding="utf-8") as f:
+            _json.dump(payload, f, ensure_ascii=False, indent=2)
+
+    return result

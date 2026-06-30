@@ -49,5 +49,8 @@ def run(args) -> int:
             output=args.output,
         )
         print(json.dumps(result, ensure_ascii=False, indent=2))
+        # 存在房型人数解析异常 → 退出码 2（PAX 不可发布）
+        if result.get("exception_count", 0) > 0:
+            return 2
         return 0
     return 1

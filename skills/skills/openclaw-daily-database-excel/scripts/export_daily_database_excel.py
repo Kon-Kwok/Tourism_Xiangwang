@@ -1015,7 +1015,7 @@ def build_workbook(conn, args, biz_date: str, start_date: str = None, end_date: 
             kpi.fill_shop_data_section(kpi_ws, cur2, latest)
             kpi.fill_cs_data_section(kpi_ws, cur2, latest)
             kpi.fill_monthly_actual_rows(kpi_ws, cur2)
-            kpi.fill_yearly_pax_step1(kpi_ws, cur2)
+            kpi.fill_yearly_pax_step1(kpi_ws, cur2, latest)
             kpi.fill_mtd_ytd_section(kpi_ws, cur2, latest)
     except Exception as e:
         print(f"Warning: failed to build shop KPI sheet: {e}")
