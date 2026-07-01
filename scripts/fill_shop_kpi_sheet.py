@@ -24,19 +24,19 @@ THIN_BORDER = Border(
 )
 BLACK_FONT = Font(name="等线", size=11, color="FF000000")
 
-# Fixed budget values (Row 24, columns B-M)
+# Fixed budget values (Row 24, columns B-M) — business reference, update annually
 MONTHLY_BUDGET = [180000, 165000, 250000, 200000, 250000, 250000,
                   200000, 200000, 165000, 300000, 250000, 165000]
 
-# 2026 Monthly targets (B30-B41) — fixed reference values
+# Monthly targets (B30-B41) — business reference, update annually
 MONTHLY_TARGETS = [682, 529, 909, 793, 1057, 1110, 962, 996, 737, 1586, 805, 408]
 
-# Fiscal month labels (Row 23): Jan(1/1-1/20) through Dec(11/21-12/30)
+# Fiscal month labels (Row 23): Jan(1/1-1/20) through Dec(11/21-12/31)
 FISCAL_MONTH_LABELS = [
     "Jan\n1/1-1/20", "Feb\n1/21-2/20", "Mar\n2/21-3/20",
     "Apr\n3/21-4/20", "May\n4/21-5/20", "Jun\n5/21-6/20",
     "Jul\n6/21-7/20", "Aug\n7/21-8/20", "Sep\n8/21-9/20",
-    "Oct\n9/21-10/20", "Nov\n10/21-11/20", "Dec\n11/21-12/30",
+    "Oct\n9/21-10/20", "Nov\n10/21-11/20", "Dec\n11/21-12/31",
 ]
 
 # Month short labels (Row 30-41)
@@ -45,32 +45,40 @@ MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
 
 NUMERIC_TEXT_RE = re.compile(r"^[¥￥]?([+-]?[\d,]+(?:\.\d*)?)$")
 
-# Fiscal month boundaries per SOP: each month = 21st of prev month to 20th of current
-# Used for alimama spend/orders (Row 25-26) and MTD alimama refs (Row 15-16)
-FISCAL_MONTH_BOUNDS: list[tuple[str, str]] = [
-    ("2026-01-01", "2026-01-21"),   # Jan:  1/1  - 1/20
-    ("2026-01-21", "2026-02-21"),   # Feb:  1/21 - 2/20
-    ("2026-02-21", "2026-03-21"),   # Mar:  2/21 - 3/20
-    ("2026-03-21", "2026-04-21"),   # Apr:  3/21 - 4/20
-    ("2026-04-21", "2026-05-21"),   # May:  4/21 - 5/20
-    ("2026-05-21", "2026-06-21"),   # Jun:  5/21 - 6/20
-    ("2026-06-21", "2026-07-21"),   # Jul:  6/21 - 7/20
-    ("2026-07-21", "2026-08-21"),   # Aug:  7/21 - 8/20
-    ("2026-08-21", "2026-09-21"),   # Sep:  8/21 - 9/20
-    ("2026-09-21", "2026-10-21"),   # Oct:  9/21 - 10/20
-    ("2026-10-21", "2026-11-21"),   # Nov:  10/21 - 11/20
-    ("2026-11-21", "2026-12-31"),   # Dec:  11/21 - 12/31
-]
 
-# Natural (calendar) month boundaries for PAX aggregation (Step1 + Step2)
-NATURAL_MONTH_BOUNDS: list[tuple[str, str]] = [
-    ("2026-01-01", "2026-02-01"), ("2026-02-01", "2026-03-01"),
-    ("2026-03-01", "2026-04-01"), ("2026-04-01", "2026-05-01"),
-    ("2026-05-01", "2026-06-01"), ("2026-06-01", "2026-07-01"),
-    ("2026-07-01", "2026-08-01"), ("2026-08-01", "2026-09-01"),
-    ("2026-09-01", "2026-10-01"), ("2026-10-01", "2026-11-01"),
-    ("2026-11-01", "2026-12-01"), ("2026-12-01", "2027-01-01"),
-]
+def get_fiscal_month_bounds(year: int) -> list[tuple[str, str]]:
+    """Fiscal month boundaries: each month = 21st of prev month to 20th of current.
+
+    Jan is special (1/1-1/20), Dec wraps to next year (11/21-12/31).
+    Used for alimama spend/orders (Row 25-26) and MTD alimama refs (Row 15-16).
+    """
+    return [
+        (f"{year}-01-01", f"{year}-01-21"),     # Jan:  1/1  - 1/20
+        (f"{year}-01-21", f"{year}-02-21"),     # Feb:  1/21 - 2/20
+        (f"{year}-02-21", f"{year}-03-21"),     # Mar:  2/21 - 3/20
+        (f"{year}-03-21", f"{year}-04-21"),     # Apr:  3/21 - 4/20
+        (f"{year}-04-21", f"{year}-05-21"),     # May:  4/21 - 5/20
+        (f"{year}-05-21", f"{year}-06-21"),     # Jun:  5/21 - 6/20
+        (f"{year}-06-21", f"{year}-07-21"),     # Jul:  6/21 - 7/20
+        (f"{year}-07-21", f"{year}-08-21"),     # Aug:  7/21 - 8/20
+        (f"{year}-08-21", f"{year}-09-21"),     # Sep:  8/21 - 9/20
+        (f"{year}-09-21", f"{year}-10-21"),     # Oct:  9/21 - 10/20
+        (f"{year}-10-21", f"{year}-11-21"),     # Nov:  10/21 - 11/20
+        (f"{year}-11-21", f"{year+1}-01-01"),    # Dec:  11/21 - 12/31
+    ]
+
+
+def get_natural_month_bounds(year: int) -> list[tuple[str, str]]:
+    """Natural (calendar) month boundaries for PAX aggregation."""
+    next_year = year + 1
+    return [
+        (f"{year}-01-01", f"{year}-02-01"), (f"{year}-02-01", f"{year}-03-01"),
+        (f"{year}-03-01", f"{year}-04-01"), (f"{year}-04-01", f"{year}-05-01"),
+        (f"{year}-05-01", f"{year}-06-01"), (f"{year}-06-01", f"{year}-07-01"),
+        (f"{year}-07-01", f"{year}-08-01"), (f"{year}-08-01", f"{year}-09-01"),
+        (f"{year}-09-01", f"{year}-10-01"), (f"{year}-10-01", f"{year}-11-01"),
+        (f"{year}-11-01", f"{year}-12-01"), (f"{year}-12-01", f"{next_year}-01-01"),
+    ]
 
 
 def parse_money(value: Any) -> float:
@@ -479,13 +487,14 @@ def _write_response_pct_cell(cell, value: float | None):
     _apply_border(cell)
 
 
-def fill_monthly_actual_rows(ws, cursor):
+def fill_monthly_actual_rows(ws, cursor, year: int):
     """Fill Row 25 (实际消耗) and Row 26 (转化单量) from alimama monthly aggregation."""
     tables = ["star_store", "tmall_express", "gravity_rubiks_cube", "wanxiangtai"]
     month_cols = list("BCDEFGHIJKLM")
+    fiscal_bounds = get_fiscal_month_bounds(year)
 
     for i, col_letter in enumerate(month_cols):
-        m_start, m_end = FISCAL_MONTH_BOUNDS[i]
+        m_start, m_end = fiscal_bounds[i]
 
         total_cost = 0.0
         total_orders = 0.0
@@ -519,27 +528,19 @@ _PAX_STATUS_CONDITION = (
 )
 
 
-def _get_step1_pax(cursor, as_of_date: str | None = None) -> dict[int, int]:
+def _get_step1_pax(cursor, year: int, as_of_date: str | None = None) -> dict[int, int]:
     """Query order_list for step 1 monthly PAX.
 
     Returns dict {1: jan_pax, ..., 12: dec_pax}.
-
-    SOP 规则：
-      - 按 order_date 自然月统计
-      - 已结束月份：完整自然月
-      - 最新月份（含 as_of_date）：[月初, as_of_date 次日 00:00)
-      - 排除 status_text = '交易关闭' / '等待买家付款'（NULL 状态不排除）
-      - 仅依据 SKU 字段（package_type）排除 11 个关键词
-      - PAX = SUM(buy_mount)
     """
     result: dict[int, int] = {}
-    # 按 SKU 字段（package_type）过滤，NULL/空 SKU 不排除
     conditions = " AND ".join(
         [f"(package_type IS NULL OR package_type NOT LIKE '%%%%{kw}%%%%')"
          for kw in _PAX_EXCLUDE_KEYWORDS]
     )
+    natural_bounds = get_natural_month_bounds(year)
     for month_num in range(1, 13):
-        m_start, m_end = NATURAL_MONTH_BOUNDS[month_num - 1]
+        m_start, m_end = natural_bounds[month_num - 1]
 
         # 截断当前月份：不统计晚于 as_of_date 的记录
         if as_of_date:
@@ -559,22 +560,15 @@ def _get_step1_pax(cursor, as_of_date: str | None = None) -> dict[int, int]:
     return result
 
 
-def _get_step2_pax(cursor, as_of_date: str | None = None) -> dict[int, int]:
+def _get_step2_pax(cursor, year: int, as_of_date: str | None = None) -> dict[int, int]:
     """Query order_list_secondary for step 2 monthly PAX.
 
     Returns dict {1: jan_pax, ..., 12: dec_pax}.
-
-    SOP 规则：
-      - 按 submit_time 自然月统计
-      - 已结束月份：完整自然月
-      - 最新月份（含 as_of_date）：[月初, as_of_date 次日 00:00)
-      - 按订单编号去重（DB 层 uk_order_id 保证）
-      - 排除订单状态为 '商家已驳回'（NULL 状态不排除）
-      - PAX = SUM(pax)（pax = buy_mount × room_capacity）
     """
     result: dict[int, int] = {m: 0 for m in range(1, 13)}
+    natural_bounds = get_natural_month_bounds(year)
     for month_num in range(1, 13):
-        m_start, m_end = NATURAL_MONTH_BOUNDS[month_num - 1]
+        m_start, m_end = natural_bounds[month_num - 1]
 
         # 截断当前月份
         if as_of_date:
@@ -637,14 +631,10 @@ def _print_pax_audit(cursor, step1: dict, step2: dict, as_of_date: str | None):
     _sys.stderr.write(f"{'='*60}\n\n")
 
 
-def fill_yearly_pax_step1(ws, cursor, as_of_date: str | None = None):
-    """Fill C30:C41 with step 1 + step 2 combined monthly PAX.
-
-    Args:
-        as_of_date: 报表日期。当前月份统计截止到该日（不含之后）。
-    """
-    step1 = _get_step1_pax(cursor, as_of_date)
-    step2 = _get_step2_pax(cursor, as_of_date)
+def fill_yearly_pax_step1(ws, cursor, year: int, as_of_date: str | None = None):
+    """Fill C30:C41 with step 1 + step 2 combined monthly PAX."""
+    step1 = _get_step1_pax(cursor, year, as_of_date)
+    step2 = _get_step2_pax(cursor, year, as_of_date)
 
     for month_num in range(1, 13):
         total_pax = step1.get(month_num, 0) + step2.get(month_num, 0)
@@ -660,10 +650,10 @@ def fill_yearly_pax_step1(ws, cursor, as_of_date: str | None = None):
     _print_pax_audit(cursor, step1, step2, as_of_date)
 
 
-def _fiscal_month_idx(biz_date_str: str) -> int:
+def _fiscal_month_idx(biz_date_str: str, year: int) -> int:
     """Return 0-based fiscal month index for a given date."""
     d = date.fromisoformat(biz_date_str)
-    for i, (start_str, end_str) in enumerate(FISCAL_MONTH_BOUNDS):
+    for i, (start_str, end_str) in enumerate(get_fiscal_month_bounds(year)):
         start = date.fromisoformat(start_str)
         end = date.fromisoformat(end_str)
         if start <= d < end:
@@ -676,14 +666,10 @@ def _natural_month_idx(biz_date_str: str) -> int:
     return date.fromisoformat(biz_date_str).month - 1
 
 
-def fill_mtd_ytd_section(ws, cursor, biz_date: str):
-    """Fill MTD (Row 13-16) and YTD (Row 18-19) with formulas.
-
-    Row 13-14 (PAX完成量/率): natural month index → C/D column
-    Row 15-16 (阿里妈妈消耗/转化): fiscal month index → Row 25/26
-    """
+def fill_mtd_ytd_section(ws, cursor, biz_date: str, year: int):
+    """Fill MTD (Row 13-16) and YTD (Row 18-19) with formulas."""
     natural_idx = _natural_month_idx(biz_date)
-    fiscal_idx = _fiscal_month_idx(biz_date)
+    fiscal_idx = _fiscal_month_idx(biz_date, year)
     cols = list("BCDEFGHIJKLM")
 
     # Row 13-14: natural month → PAX

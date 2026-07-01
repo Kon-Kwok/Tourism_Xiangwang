@@ -1015,9 +1015,9 @@ def build_workbook(conn, args, biz_date: str, start_date: str = None, end_date: 
             kpi_ws["B1"].font = Font(name="等线", size=11)
             kpi.fill_shop_data_section(kpi_ws, cur2, latest)
             kpi.fill_cs_data_section(kpi_ws, cur2, latest)
-            kpi.fill_monthly_actual_rows(kpi_ws, cur2)
-            kpi.fill_yearly_pax_step1(kpi_ws, cur2, latest)
-            kpi.fill_mtd_ytd_section(kpi_ws, cur2, latest)
+            kpi.fill_monthly_actual_rows(kpi_ws, cur2, year=ref_year)
+            kpi.fill_yearly_pax_step1(kpi_ws, cur2, year=ref_year, as_of_date=latest)
+            kpi.fill_mtd_ytd_section(kpi_ws, cur2, latest, year=ref_year)
     except Exception as e:
         print(f"Warning: failed to build shop KPI sheet: {e}")
 
