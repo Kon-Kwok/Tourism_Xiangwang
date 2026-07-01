@@ -563,24 +563,23 @@ def _get_step1_pax(cursor, year: int, as_of_date: str | None = None) -> dict[int
 def _get_step2_pax(cursor, year: int, as_of_date: str | None = None) -> dict[int, int]:
     """Query order_list_secondary for step 2 monthly PAX.
 
-    Returns dict {1: jan_pax, ..., 12: dec_pax}.
+    PAX = SUM(buy_mount). SOP: I列的数量 = buy_mount (飞猪API的pcount / 购买数量).
+    Dedup via uk_order_id. Exclude 商家已驳回.
     """
     result: dict[int, int] = {m: 0 for m in range(1, 13)}
     natural_bounds = get_natural_month_bounds(year)
     for month_num in range(1, 13):
         m_start, m_end = natural_bounds[month_num - 1]
 
-        # 截断当前月份
         if as_of_date:
             cutoff = (date.fromisoformat(as_of_date) + timedelta(days=1)).isoformat()
             if cutoff < m_end:
                 m_end = cutoff
 
         cursor.execute(
-            "SELECT COALESCE(SUM(pax), 0) FROM Xiangwang.order_list_secondary "
+            "SELECT COALESCE(SUM(buy_mount), 0) FROM Xiangwang.order_list_secondary "
             "WHERE submit_time >= %s AND submit_time < %s "
-            "AND (status_text IS NULL OR status_text != '商家已驳回') "
-            "AND pax IS NOT NULL",
+            "AND (status_text IS NULL OR status_text != '商家已驳回')",
             (m_start, m_end),
         )
         row = cursor.fetchone()
