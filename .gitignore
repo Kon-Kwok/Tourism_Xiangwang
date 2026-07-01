@@ -52,6 +52,10 @@ chrome-user-data/
 .env.local
 *.local
 
+# 本地运行产物
+exports/
+logs/
+
 # Codex / Playwright local artifacts
 .codex
 .playwright-cli/
