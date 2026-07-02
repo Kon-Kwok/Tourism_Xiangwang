@@ -60,7 +60,7 @@ python3 skills/skills/openclaw-daily-database-excel/scripts/export_daily_databas
 | 月度预算消耗 | 每月预算 / 实际消耗 / 转化单量 | 固定值 + 阿里妈妈四表财务月(21号-20号)聚合 |
 | MTD / YTD | 完成量 / 完成率 / 投放消耗 / 投放转化 | Excel 公式引用（PAX→自然月, 阿里妈妈→财务月） |
 | 年度完成情况 | 2026 target / Actual PAX / 完成率 | 固定 target + Step1(order_list 自然月聚合) + Step2(order_list_secondary 自然月聚合) |
-| 条件格式 | 涨绿跌红(含 +/- 符号)，响应时间反转 | 代码实现 |
+| 条件格式 | 涨绿跌红(含 +/- 符号) | 代码实现 |
 
 **PAX 计算口径：**
 - **Step1**：`order_list`，自然月，排除 `status_text IN ('交易关闭','等待买家付款')`，排除 `package_type` 含 16 个关键词（补差/补、尾款、升级/升/升房/升舱、税费/补税、改期/改/改航线、加人/加、生日礼遇、通兑），`SUM(buy_mount)` = PAX

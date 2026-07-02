@@ -432,7 +432,7 @@ def fill_cs_data_section(ws, cursor, biz_date: str):
         _write_pct_cell(ws.cell(row=9, column=col), vs_yest)
         _write_pct_cell(ws.cell(row=10, column=col), vs_lw)
 
-    # Columns D-E: 首响/平响 from team_dashboard_daily (inverted: lower=faster=greener)
+    # Columns D-E: 首响/平响 from team_dashboard_daily
     first_today = _get_team_dashboard_metric(cursor, "first_response_sec", biz_date)
     first_yest = _get_team_dashboard_metric(cursor, "first_response_sec", yesterday)
     first_lw = _get_team_dashboard_metric(cursor, "first_response_sec", lw_date)
@@ -448,8 +448,8 @@ def fill_cs_data_section(ws, cursor, biz_date: str):
     for col, today_val, yest_val, lw_val in resp_metrics:
         vs_yest = today_val / yest_val if (today_val and yest_val) else None
         vs_lw = today_val / lw_val if (today_val and lw_val) else None
-        _write_response_pct_cell(ws.cell(row=9, column=col), vs_yest)
-        _write_response_pct_cell(ws.cell(row=10, column=col), vs_lw)
+        _write_pct_cell(ws.cell(row=9, column=col), vs_yest)
+        _write_pct_cell(ws.cell(row=10, column=col), vs_lw)
 
 
 def _get_team_dashboard_metric(cursor, column: str, biz_date: str) -> float | None:
@@ -466,9 +466,10 @@ def _get_team_dashboard_metric(cursor, column: str, biz_date: str) -> float | No
 
 
 def _write_response_pct_cell(cell, value: float | None):
-    """Write a percentage cell for response time with +/- sign, inverted color.
+    """Write a percentage cell for response time with +/- sign.
 
-    Lower = faster = green.  Stores delta from 1.0, uses '+0.00%;-0.00%' format.
+    Uses same color rule as _write_pct_cell: positive=green, negative=red, zero=black.
+    Stores delta from 1.0, uses '+0.00%;-0.00%' format.
     """
     cell.number_format = '+0.00%;-0.00%'
     if value is None:
@@ -477,12 +478,12 @@ def _write_response_pct_cell(cell, value: float | None):
     else:
         delta = value - 1.0
         cell.value = delta
-        if delta < 0:
-            cell.font = Font(name="等线", size=11, color="FF008000")  # faster
-        elif delta > 0:
-            cell.font = Font(name="等线", size=11, color="FFFF0000")  # slower
+        if delta > 0:
+            cell.font = Font(name="等线", size=11, color="FF008000")  # up=green
+        elif delta < 0:
+            cell.font = Font(name="等线", size=11, color="FFFF0000")  # down=red
         else:
-            cell.font = Font(name="等线", size=11, color="FF000000")
+            cell.font = Font(name="等线", size=11, color="FF000000")  # flat=black
     cell.alignment = Alignment(vertical="center")
     _apply_border(cell)
 
