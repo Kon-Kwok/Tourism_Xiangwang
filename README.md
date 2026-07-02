@@ -57,12 +57,33 @@ python3 skills/skills/openclaw-daily-database-excel/scripts/export_daily_databas
 |------|------|----------|
 | 店铺数据 | Total UV / Paid UV / Paid Cost / Total BK / Paid BK / Paid ROI | shop_daily_key_data + shop_data_daily_registration + 阿里妈妈四表 |
 | 客服数据 | 咨询人数 / 接待人数 / 首响 / 平响 / 订单数 | shop_data_daily_registration + customer_service_performance_summary + team_dashboard_daily |
-| 月度预算消耗 | 每月预算 / 实际消耗 / 转化单量 | 固定值 + 阿里妈妈四表按月聚合 |
-| MTD / YTD | 完成量 / 完成率 / 投放消耗 / 投放转化 | Excel 公式引用 Yearly 表 |
-| 年度完成情况 | 2026 target / Actual PAX / 完成率 | 固定 target + order_list 聚合(Step1) + order_list_secondary 聚合(Step2) |
-| 条件格式 | 涨绿(>100%) 跌红(<100%)，响应时间反转 | 代码实现 |
+| 月度预算消耗 | 每月预算 / 实际消耗 / 转化单量 | 固定值 + 阿里妈妈四表财务月(21号-20号)聚合 |
+| MTD / YTD | 完成量 / 完成率 / 投放消耗 / 投放转化 | Excel 公式引用（PAX→自然月, 阿里妈妈→财务月） |
+| 年度完成情况 | 2026 target / Actual PAX / 完成率 | 固定 target + Step1(order_list 自然月聚合) + Step2(order_list_secondary 自然月聚合) |
+| 条件格式 | 涨绿跌红(含 +/- 符号)，响应时间反转 | 代码实现 |
+
+**PAX 计算口径：**
+- **Step1**：`order_list`，自然月，排除 `status_text IN ('交易关闭','等待买家付款')`，排除 `package_type` 含 16 个关键词（补差/补、尾款、升级/升/升房/升舱、税费/补税、改期/改/改航线、加人/加、生日礼遇、通兑），`SUM(buy_mount)` = PAX
+- **Step2**：`order_list_secondary`，自然月，排除 `status_text = '商家已驳回'`，按 `order_id` 去重（唯一键），`SUM(buy_mount)` = PAX（pcount 字段，不乘 Q）
+- **月度 PAX = Step1 + Step2**
+
+**月份口径：**
+- PAX（C30:C41）：自然月（1号至月末）
+- 阿里妈妈消耗/转化（Row 25-26）：财务月（21号至次月20号）
+- MTD Row 13-14：自然月索引 → PAX
+- MTD Row 15-16：财务月索引 → 阿里妈妈
+
+**导出参数：**
+```bash
+# 指定 KPI 对比日期（与数据范围解耦）
+--kpi-date 2026-06-30
+
+# 优先级: --kpi-date > --date > --end > 自动检测
+```
 
 核心实现文件：`scripts/fill_shop_kpi_sheet.py`
+
+> **业务验证状态**：5月 PAX=813（与业务完全一致 ✅），6月已核验通过 ✅
 
 ## 采集流程
 
@@ -128,5 +149,5 @@ python3 -m unittest tests.test_refactored_clients
 - 飞猪订单采集必须使用 `--all-pages`。
 - `shop_daily_key_data` 的 `日期` 索引可能非唯一，写入保持 `UPDATE` 后 `INSERT ... WHERE NOT EXISTS`。
 - 二次预约采集需确保 `yuyue.fliggy.com` 页面在 Chrome 中已打开，否则 `find_tab_by_url_pattern` 会报错。
-- 2026Actual PAX 由 Step1（order_list 过滤聚合）+ Step2（order_list_secondary 聚合）组成，Step2 的 `pax` 字段当前取 API 的 `pcount`（非 I×Q），口径待业务最终确认。
+- 2026Actual PAX = Step1（order_list 关键词过滤） + Step2（order_list_secondary 排除商家已驳回），Step2 取 `buy_mount`（API pcount 字段），不乘 Q。业务已核验确认。
 - 不要提交 cookies、本地 Chrome profile、数据库 dump 或真实密钥。
