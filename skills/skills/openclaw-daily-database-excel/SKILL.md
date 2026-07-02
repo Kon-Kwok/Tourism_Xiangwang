@@ -28,6 +28,18 @@ python3 skills/skills/openclaw-daily-database-excel/scripts/export_daily_databas
 
 # 日期范围 + 指定输出文件
 python3 skills/skills/openclaw-daily-database-excel/scripts/export_daily_database_excel.py --start 2026-05-01 --end 2026-05-17 --output exports/merged.xlsx
+
+# 指定 KPI 对比日期（独立于数据日期范围）
+python3 skills/skills/openclaw-daily-database-excel/scripts/export_daily_database_excel.py \
+  --date 2026-05-02 --kpi-date 2026-06-30
+```
+
+### 生成邮件正文
+
+导出 Excel 后可生成「店铺关键数据完成情况」sheet 第1-19行的邮件正文：
+
+```bash
+python3 scripts/generate_email_body.py exports/象往日报_2026年5-6月.xlsx
 ```
 
 ## 默认输出
@@ -93,6 +105,7 @@ python3 skills/skills/openclaw-daily-database-excel/scripts/export_daily_databas
 - `customer_service_data_daily`，日期列 `日期`
 - `customer_service_performance_summary`，日期列 `date_time`
 - `customer_service_performance_workload_analysis`，日期列 `date_time`
+- `team_dashboard_daily`，日期列 `date_time`（首响/平响）
 - `shop_daily_key_data`，日期列 `日期`
 - `shop_data_daily_registration`，日期列 `日期`
 - `star_store`，日期列 `date_time`
@@ -100,10 +113,29 @@ python3 skills/skills/openclaw-daily-database-excel/scripts/export_daily_databas
 - `gravity_rubiks_cube`，日期列 `date_time`
 - `wanxiangtai`，日期列 `date_time`
 - `wanxiangtai_2`，日期列 `date_time`
+- `order_list`，日期列 `order_date`（不导出明细，仅用于 KPI sheet 聚合）
+- `order_list_secondary`，日期列 `submit_time`（不导出明细，仅用于 KPI sheet 聚合）
 
 如果要导出库里所有存在日期列且当日有数据的表，加 `--all-date-tables`。脚本会自动识别 `日期`、`date_time`、`order_date`、`biz_date` 等常见日期列。
 
 默认跳过当日 `0` 行的空表，不创建空 sheet。
+
+### 店铺关键数据完成情况 Sheet
+
+导出 Excel 时**自动生成**「店铺关键数据完成情况」sheet，包含：
+
+| 板块 | 指标 | 数据来源 |
+|------|------|----------|
+| 店铺数据 | Total UV / Paid UV / Paid Cost / Total BK / Paid BK / Paid ROI | shop_daily_key_data + shop_data_daily_registration + 阿里妈妈四表 |
+| 客服数据 | 咨询人数 / 接待人数 / 首响 / 平响 / 订单数 | shop_data_daily_registration + customer_service_performance_summary + team_dashboard_daily |
+| 月度预算消耗 | 每月预算 / 实际消耗 / 转化单量 | 固定值 + 阿里妈妈四表财务月(21号-20号)聚合 |
+| MTD / YTD | 完成量 / 完成率 / 投放消耗 / 投放转化 | Excel 公式引用（PAX→自然月, 阿里妈妈→财务月） |
+| 年度完成情况 | target / Actual PAX / 完成率 | 固定 target + Step1(order_list) + Step2(order_list_secondary) |
+| 条件格式 | 涨绿跌红（含 +/- 符号），响应时间反转 | 代码实现 |
+
+**KPI 对比日期优先级**: `--kpi-date` > `--date` > `--end` > 自动检测最新日期
+
+核心实现：`scripts/fill_shop_kpi_sheet.py`
 
 ## 使用规则
 
@@ -113,3 +145,5 @@ python3 skills/skills/openclaw-daily-database-excel/scripts/export_daily_databas
 - 导出前不自动采集数据；当日表为空时默认不导出该表。
 - 用户要求“只导出入库过的表”“不要空表”时，保持默认行为，不加 `--include-empty-tables`。
 - 需要先采集日报时，先使用 `openclaw-daily-data-collection` 技能运行采集，再运行本技能导出 Excel。
+- 导出的 Excel 自动包含「店铺关键数据完成情况」sheet，KPI 对比日期通过 `--kpi-date` 指定。
+- 用户要"邮件正文"时，先导出 Excel，再运行 `python3 scripts/generate_email_body.py <excel文件>` 生成可粘贴的邮件正文。
