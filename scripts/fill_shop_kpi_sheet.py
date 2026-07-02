@@ -115,7 +115,7 @@ def build_sheet_structure(ws, year: int = 2026):
         _apply_border(ws[ref])
 
     ws["A5"] = "VS Yesterday"
-    ws["A6"] = "VS LV"
+    ws["A6"] = "VS LW"
     for ref in ("A5", "A6"):
         ws[ref].font = NORMAL_FONT
         ws[ref].alignment = Alignment(vertical="center")
@@ -138,7 +138,7 @@ def build_sheet_structure(ws, year: int = 2026):
         _apply_border(ws[ref])
 
     ws["A9"] = "VS Yesterday"
-    ws["A10"] = "VS LV"
+    ws["A10"] = "VS LW"
     for ref in ("A9", "A10"):
         ws[ref].font = NORMAL_FONT
         ws[ref].alignment = Alignment(vertical="center")
