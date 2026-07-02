@@ -681,34 +681,28 @@ def fill_mtd_ytd_section(ws, cursor, biz_date: str, year: int):
     ws["B13"] = f"=C{30 + natural_idx}"
     ws["B13"].font = NORMAL_FONT
     ws["B13"].alignment = Alignment(vertical="center")
-    _apply_border(ws["B13"])
 
     ws["B14"] = f"=D{30 + natural_idx}"
     ws["B14"].font = NORMAL_FONT
     ws["B14"].number_format = '0%'
     ws["B14"].alignment = Alignment(vertical="center")
-    _apply_border(ws["B14"])
 
     # Row 15-16: fiscal month → alimama
     ws["B15"] = f"={cols[fiscal_idx]}25"
     ws["B15"].font = NORMAL_FONT
     ws["B15"].number_format = '#,##0'
     ws["B15"].alignment = Alignment(vertical="center")
-    _apply_border(ws["B15"])
 
     ws["B16"] = f"={cols[fiscal_idx]}26"
     ws["B16"].font = NORMAL_FONT
     ws["B16"].alignment = Alignment(vertical="center")
-    _apply_border(ws["B16"])
 
     ws["B18"] = "=C42"
     ws["B18"].font = NORMAL_FONT
     ws["B18"].number_format = '#,##0'
     ws["B18"].alignment = Alignment(vertical="center")
-    _apply_border(ws["B18"])
 
     ws["B19"] = "=D42"
     ws["B19"].font = NORMAL_FONT
     ws["B19"].number_format = '0%'
     ws["B19"].alignment = Alignment(vertical="center")
-    _apply_border(ws["B19"])
