@@ -79,7 +79,8 @@ def resolve_formula(ws, ref_str: str):
 
 
 def extract(ws) -> str:
-    lines = []
+    # --- Pass 1: collect all rows ---
+    all_rows = []
     for r in range(1, 20):
         ncols = COL_COUNTS.get(r, 7)
         row_vals = []
@@ -93,7 +94,6 @@ def extract(ws) -> str:
             if s.startswith("=IFERROR") or s.startswith("=SUM") or (s.startswith("=") and r >= 13):
                 resolved = resolve_formula(ws, s)
                 if resolved is not None:
-                    # D列完成率是比值(如1.078), 非delta; Row9-10 VS是delta
                     is_rate = s.startswith("=IFERROR") or "完成率" in str(ws.cell(row=r, column=1).value or "")
                     if is_rate:
                         row_vals.append(f"{resolved:.1%}")
@@ -110,15 +110,43 @@ def extract(ws) -> str:
             else:
                 row_vals.append(cell_text(v))
 
-        # Skip completely empty rows
         if all(x == "" for x in row_vals):
-            continue
+            all_rows.append(None)  # marker for empty row
+        else:
+            all_rows.append(row_vals)
 
-        # Align columns
+    # --- Pass 2: calculate per-column max widths ---
+    max_cols = max(len(r) for r in all_rows if r is not None)
+    col_widths = [0] * max_cols
+    for row_vals in all_rows:
+        if row_vals is None:
+            continue
+        for i, val in enumerate(row_vals):
+            # 中文字符按 2 宽度计算
+            w = 0
+            for ch in str(val):
+                w += 2 if '一' <= ch <= '鿿' or '　' <= ch <= '〿' or '＀' <= ch <= '￯' else 1
+            if w > col_widths[i]:
+                col_widths[i] = w
+
+    # Add padding between columns
+    col_widths = [w + 2 for w in col_widths]
+
+    # --- Pass 3: build lines ---
+    lines = []
+    for row_vals in all_rows:
+        if row_vals is None:
+            lines.append("")
+            continue
         line = ""
         for i, val in enumerate(row_vals):
-            width = 14 if i > 0 else 18
-            line += str(val).ljust(width)
+            s = str(val)
+            # Pad to column width accounting for CJK characters
+            w = sum(2 if '一' <= ch <= '鿿' or '　' <= ch <= '〿' or '＀' <= ch <= '￯' else 1 for ch in s)
+            pad = col_widths[i] - w
+            if pad > 0:
+                s += " " * pad
+            line += s
         lines.append(line.rstrip())
 
     lines.append("")
