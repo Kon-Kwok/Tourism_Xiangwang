@@ -165,13 +165,27 @@ def _hdr_td(text: str, colspan: int = 1) -> str:
     return _td(text, color=WHITE, bold=True, bg=DARK_BLUE, colspan=colspan)
 
 
+HTML_WRAPPER_HEAD = """<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>店铺关键数据完成情况</title>
+</head>
+<body style="font-family:'等线',Arial,'Microsoft YaHei',sans-serif;font-size:12px;">
+"""
+
+HTML_WRAPPER_TAIL = """</body>
+</html>"""
+
+
 def extract_html(ws) -> str:
     """Generate HTML email body mirroring the KPI sheet."""
-    lines = []
+    lines = [HTML_WRAPPER_HEAD]
 
     # === Row 1: Date ===
     date_val = cell_text(ws.cell(row=1, column=2).value)
-    lines.append(f'<p style="font-family:\'等线\',Arial,sans-serif;font-size:12px;margin:0 0 8px 0;">'
+    lines.append(f'<p style="margin:0 0 8px 0;">'
                  f'<b>店铺关键数据完成情况</b>&nbsp;&nbsp;Date: {date_val}</p>')
 
     # === 店铺数据 (Rows 4-6) ===
@@ -221,8 +235,8 @@ def extract_html(ws) -> str:
     lines.append('</table>')
 
     # Footer
-    lines.append(f'<p style="font-family:\'等线\',Arial,sans-serif;font-size:12px;color:#666;margin-top:16px;">'
-                 f'{FOOTER}</p>')
+    lines.append(f'<p style="color:#666;margin-top:16px;">{FOOTER}</p>')
+    lines.append(HTML_WRAPPER_TAIL)
 
     return "\n".join(lines)
 
