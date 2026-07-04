@@ -28,7 +28,7 @@ BLACK_FONT = Font(name="等线", size=11, color="FF000000")
 MONTHLY_BUDGET = [180000, 165000, 250000, 200000, 250000, 250000,
                   200000, 200000, 165000, 300000, 250000, 165000]
 
-# Monthly targets (B30-B41) — business reference, update annually
+# Monthly targets (B36-B47) — business reference, update annually
 MONTHLY_TARGETS = [682, 529, 909, 793, 1057, 1110, 962, 996, 737, 1586, 805, 408]
 
 # Fiscal month labels (Row 23): Jan(1/1-1/20) through Dec(11/21-12/31)
@@ -103,7 +103,7 @@ def build_sheet_structure(ws, year: int = 2026):
     ws["A1"].alignment = Alignment(vertical="center")
     _apply_border(ws["A1"])
 
-    # --- Rows 4-6: 店铺数据 ---
+    # --- Rows 4-9: 店铺数据 ---
     shop_headers = {
         "A4": "店铺数据", "B4": "Total UV", "C4": "Paid UV",
         "D4": "Paid Cost", "E4": "TotalBK", "F4": "PaidBK", "G4": "Paid ROI",
@@ -114,22 +114,37 @@ def build_sheet_structure(ws, year: int = 2026):
         ws[ref].alignment = Alignment(vertical="center")
         _apply_border(ws[ref])
 
-    ws["A5"] = "VS Yesterday"
-    ws["A6"] = "VS LW"
-    for ref in ("A5", "A6"):
+    # Rows 5-7: 今日数据 / 昨日数据 / 上周数据 (raw values, no color)
+    ws["A5"] = "今日数据"
+    ws["A6"] = "昨日数据"
+    ws["A7"] = "上周数据"
+    for ref in ("A5", "A6", "A7"):
         ws[ref].font = NORMAL_FONT
         ws[ref].alignment = Alignment(vertical="center")
         _apply_border(ws[ref])
-    for r in range(5, 7):
+    for r in range(5, 8):
         for c in range(2, 8):
             cell = ws.cell(row=r, column=c)
             _apply_border(cell)
             cell.alignment = Alignment(vertical="center")
 
-    # --- Rows 8-10: 客服数据 ---
+    # Rows 8-9: VS Yesterday / VS LW
+    ws["A8"] = "VS Yesterday"
+    ws["A9"] = "VS LW"
+    for ref in ("A8", "A9"):
+        ws[ref].font = NORMAL_FONT
+        ws[ref].alignment = Alignment(vertical="center")
+        _apply_border(ws[ref])
+    for r in range(8, 10):
+        for c in range(2, 8):
+            cell = ws.cell(row=r, column=c)
+            _apply_border(cell)
+            cell.alignment = Alignment(vertical="center")
+
+    # --- Rows 11-16: 客服数据 ---
     cs_headers = {
-        "A8": "客服数据", "B8": "咨询人数", "C8": "接待人数",
-        "D8": "首响", "E8": "平响", "F8": "订单数",
+        "A11": "客服数据", "B11": "咨询人数", "C11": "接待人数",
+        "D11": "首响", "E11": "平响", "F11": "订单数",
     }
     for ref, text in cs_headers.items():
         ws[ref] = text
@@ -137,99 +152,114 @@ def build_sheet_structure(ws, year: int = 2026):
         ws[ref].alignment = Alignment(vertical="center")
         _apply_border(ws[ref])
 
-    ws["A9"] = "VS Yesterday"
-    ws["A10"] = "VS LW"
-    for ref in ("A9", "A10"):
+    # Rows 12-14: 今日数据 / 昨日数据 / 上周数据 (raw values, no color)
+    ws["A12"] = "今日数据"
+    ws["A13"] = "昨日数据"
+    ws["A14"] = "上周数据"
+    for ref in ("A12", "A13", "A14"):
         ws[ref].font = NORMAL_FONT
         ws[ref].alignment = Alignment(vertical="center")
         _apply_border(ws[ref])
-    for r in range(9, 11):
+    for r in range(12, 15):
         for c in range(2, 7):
             cell = ws.cell(row=r, column=c)
             _apply_border(cell)
             cell.alignment = Alignment(vertical="center")
 
-    # --- Rows 12-19: MTD / YTD ---
-    ws.merge_cells("A12:B12")
-    ws["A12"] = "Month Target"
-    ws["A12"].font = NORMAL_FONT
-    ws["A12"].alignment = Alignment(vertical="center")
+    # Rows 15-16: VS Yesterday / VS LW
+    ws["A15"] = "VS Yesterday"
+    ws["A16"] = "VS LW"
+    for ref in ("A15", "A16"):
+        ws[ref].font = NORMAL_FONT
+        ws[ref].alignment = Alignment(vertical="center")
+        _apply_border(ws[ref])
+    for r in range(15, 17):
+        for c in range(2, 7):
+            cell = ws.cell(row=r, column=c)
+            _apply_border(cell)
+            cell.alignment = Alignment(vertical="center")
+
+    # --- Rows 18-25: MTD / YTD ---
+    ws.merge_cells("A18:B18")
+    ws["A18"] = "Month Target"
+    ws["A18"].font = NORMAL_FONT
+    ws["A18"].alignment = Alignment(vertical="center")
 
     mtd_labels = {
-        "A13": "MTD完成量:", "A14": "MTD完成率:",
-        "A15": "MTD投放(阿里妈妈)消耗总额:", "A16": "MTD投放(阿里妈妈)转化量:",
-        "A18": "YTD完成量:", "A19": "YTD完成率:",
+        "A19": "MTD完成量:", "A20": "MTD完成率:",
+        "A21": "MTD投放(阿里妈妈)消耗总额:", "A22": "MTD投放(阿里妈妈)转化量:",
+        "A24": "YTD完成量:", "A25": "YTD完成率:",
     }
     for ref, text in mtd_labels.items():
         ws[ref] = text
         ws[ref].font = NORMAL_FONT
         ws[ref].alignment = Alignment(vertical="center")
 
-    # --- Rows 22-26: 月度预算和消耗进度表 ---
-    ws.merge_cells("B22:D22")
-    ws.merge_cells("E22:G22")
-    ws.merge_cells("H22:J22")
-    ws.merge_cells("K22:M22")
-    ws.merge_cells("A22:A23")
-    ws["A22"] = "月份"
-    _set_header_cell(ws["A22"], "月份", wrap=True)
+    # --- Rows 28-32: 月度预算和消耗进度表 ---
+    ws.merge_cells("B28:D28")
+    ws.merge_cells("E28:G28")
+    ws.merge_cells("H28:J28")
+    ws.merge_cells("K28:M28")
+    ws.merge_cells("A28:A29")
+    ws["A28"] = "月份"
+    _set_header_cell(ws["A28"], "月份", wrap=True)
     for col_letter, text in [("B", "Q1"), ("E", "Q2"), ("H", "Q3"), ("K", "Q4")]:
-        _set_header_cell(ws[f"{col_letter}22"], text)
+        _set_header_cell(ws[f"{col_letter}28"], text)
 
     month_cols = list("BCDEFGHIJKLM")
     for i, col_letter in enumerate(month_cols):
-        _set_header_cell(ws[f"{col_letter}23"], FISCAL_MONTH_LABELS[i], wrap=True)
-    # C,D,F,G,I,J,L,M row 22 are inside merged Q1-Q4 ranges; skip them
+        _set_header_cell(ws[f"{col_letter}29"], FISCAL_MONTH_LABELS[i], wrap=True)
+    # C,D,F,G,I,J,L,M row 28 are inside merged Q1-Q4 ranges; skip them
 
-    # Row 24: 每月预算
-    ws["A24"] = "每月预算"
-    ws["A24"].font = NORMAL_FONT_10
-    ws["A24"].alignment = Alignment(vertical="center")
-    _apply_border(ws["A24"])
+    # Row 30: 每月预算
+    ws["A30"] = "每月预算"
+    ws["A30"].font = NORMAL_FONT_10
+    ws["A30"].alignment = Alignment(vertical="center")
+    _apply_border(ws["A30"])
     for i, col_letter in enumerate(month_cols):
-        cell = ws[f"{col_letter}24"]
+        cell = ws[f"{col_letter}30"]
         cell.value = MONTHLY_BUDGET[i]
         cell.font = NORMAL_FONT_10
         cell.number_format = '#,##0'
         cell.alignment = Alignment(vertical="center")
         _apply_border(cell)
 
-    # Row 25: 实际消耗
-    ws["A25"] = "实际消耗"
-    ws["A25"].font = NORMAL_FONT_10
-    ws["A25"].alignment = Alignment(vertical="center")
-    _apply_border(ws["A25"])
+    # Row 31: 实际消耗
+    ws["A31"] = "实际消耗"
+    ws["A31"].font = NORMAL_FONT_10
+    ws["A31"].alignment = Alignment(vertical="center")
+    _apply_border(ws["A31"])
     for col_letter in month_cols:
-        cell = ws[f"{col_letter}25"]
+        cell = ws[f"{col_letter}31"]
         cell.font = NORMAL_FONT_10
         cell.number_format = '#,##0'
         cell.alignment = Alignment(vertical="center")
         _apply_border(cell)
 
-    # Row 26: 转化单量
-    ws["A26"] = "转化单量"
-    ws["A26"].font = NORMAL_FONT_10
-    ws["A26"].alignment = Alignment(vertical="center")
-    _apply_border(ws["A26"])
+    # Row 32: 转化单量
+    ws["A32"] = "转化单量"
+    ws["A32"].font = NORMAL_FONT_10
+    ws["A32"].alignment = Alignment(vertical="center")
+    _apply_border(ws["A32"])
     for col_letter in month_cols:
-        cell = ws[f"{col_letter}26"]
+        cell = ws[f"{col_letter}32"]
         cell.font = NORMAL_FONT_10
         cell.number_format = '#,##0'
         cell.alignment = Alignment(vertical="center")
         _apply_border(cell)
 
-    # --- Rows 29-42: 年度完成情况表 ---
-    ws["A29"] = "月份"
-    ws["B29"] = f"{year}\ntarget"
-    ws["C29"] = f"{year}\nActual"
-    ws["D29"] = "完成率"
-    for ref in ("A29", "B29", "C29", "D29"):
+    # --- Rows 35-48: 年度完成情况表 ---
+    ws["A35"] = "月份"
+    ws["B35"] = f"{year}\ntarget"
+    ws["C35"] = f"{year}\nActual"
+    ws["D35"] = "完成率"
+    for ref in ("A35", "B35", "C35", "D35"):
         ws[ref].font = NORMAL_FONT
         ws[ref].alignment = Alignment(vertical="center")
         _apply_border(ws[ref])
 
     for i, (label, target) in enumerate(zip(MONTH_LABELS, MONTHLY_TARGETS)):
-        r = 30 + i
+        r = 36 + i
         ws[f"A{r}"] = label
         ws[f"A{r}"].font = NORMAL_FONT
         ws[f"B{r}"] = target
@@ -242,18 +272,18 @@ def build_sheet_structure(ws, year: int = 2026):
             ws.cell(row=r, column=c).alignment = Alignment(vertical="center")
             _apply_border(ws.cell(row=r, column=c))
 
-    # Row 42: 总计
-    ws["A42"] = "总计"
-    ws["B42"] = "=SUM(B30:B41)"
-    ws["C42"] = "=SUM(C30:C41)"
-    ws["D42"] = '=IFERROR(C42/B42,"")'
-    for ref in ("A42", "B42", "C42", "D42"):
+    # Row 48: 总计
+    ws["A48"] = "总计"
+    ws["B48"] = "=SUM(B36:B47)"
+    ws["C48"] = "=SUM(C36:C47)"
+    ws["D48"] = '=IFERROR(C48/B48,"")'
+    for ref in ("A48", "B48", "C48", "D48"):
         ws[ref].font = NORMAL_FONT
         ws[ref].alignment = Alignment(vertical="center")
         _apply_border(ws[ref])
-    ws["D42"].number_format = '0%'
-    ws["B42"].number_format = '#,##0'
-    ws["C42"].number_format = '#,##0'
+    ws["D48"].number_format = '0%'
+    ws["B48"].number_format = '#,##0'
+    ws["C48"].number_format = '#,##0'
 
     # --- Column widths ---
     col_widths = {"A": 13.0, "B": 13.0, "C": 13.0, "D": 13.0,
@@ -263,8 +293,8 @@ def build_sheet_structure(ws, year: int = 2026):
         ws.column_dimensions[cl].width = w
 
     # Row heights
-    ws.row_dimensions[23].height = 39.6
-    ws.row_dimensions[29].height = 27.6
+    ws.row_dimensions[29].height = 39.6
+    ws.row_dimensions[35].height = 27.6
 
 
 def _set_header_cell(cell, text: str, wrap: bool = False):
@@ -354,7 +384,7 @@ def _write_pct_cell(cell, value: float | None):
 
 
 def fill_shop_data_section(ws, cursor, biz_date: str):
-    """Fill Rows 5-6 (VS Yesterday / VS LW) for B-G columns."""
+    """Fill Rows 5-7 (今日/昨日/上周 raw values) and Rows 8-9 (VS Yesterday / VS LW) for B-G columns."""
     yesterday = str(date.fromisoformat(biz_date) - timedelta(days=1))
     lw_date = str(date.fromisoformat(biz_date) - timedelta(days=7))
 
@@ -385,6 +415,28 @@ def fill_shop_data_section(ws, cursor, biz_date: str):
     roi_yest = sales_yest / cost_yest if cost_yest else 0
     roi_lw = sales_lw / cost_lw if cost_lw else 0
 
+    # --- Rows 5-7: raw values (今日/昨日/上周) ---
+    # Col B=2(Total UV, int), C=3(Paid UV, int), D=4(Paid Cost, ¥),
+    # E=5(TotalBK, int), F=6(PaidBK, int), G=7(Paid ROI, ratio)
+    raw_data = [
+        # (col, today, yest, lw, number_format)
+        (2, uv_today, uv_yest, uv_lw, '#,##0'),
+        (3, paid_uv_today, paid_uv_yest, paid_uv_lw, '#,##0'),
+        (4, cost_today, cost_yest, cost_lw, '¥#,##0.00'),
+        (5, bk_today, bk_yest, bk_lw, '#,##0'),
+        (6, paid_bk_today, paid_bk_yest, paid_bk_lw, '#,##0'),
+        (7, roi_today, roi_yest, roi_lw, '0.00'),
+    ]
+    for col, today_val, yest_val, lw_val, num_fmt in raw_data:
+        for row, val in [(5, today_val), (6, yest_val), (7, lw_val)]:
+            cell = ws.cell(row=row, column=col)
+            cell.value = val if val else (None if col in (4, 7) else 0)
+            cell.font = NORMAL_FONT
+            cell.number_format = num_fmt
+            cell.alignment = Alignment(vertical="center")
+            _apply_border(cell)
+
+    # --- Rows 8-9: VS Yesterday / VS LW ---
     metrics = [
         (2, uv_today, uv_yest, uv_lw),
         (3, paid_uv_today, paid_uv_yest, paid_uv_lw),
@@ -397,14 +449,14 @@ def fill_shop_data_section(ws, cursor, biz_date: str):
     for col, today_val, yest_val, lw_val in metrics:
         vs_yest = today_val / yest_val if yest_val else None
         vs_lw = today_val / lw_val if lw_val else None
-        _write_pct_cell(ws.cell(row=5, column=col), vs_yest)
-        _write_pct_cell(ws.cell(row=6, column=col), vs_lw)
+        _write_pct_cell(ws.cell(row=8, column=col), vs_yest)
+        _write_pct_cell(ws.cell(row=9, column=col), vs_lw)
 
 
 # ---- Task 4: CS data + monthly actual + MTD/YTD ----
 
 def fill_cs_data_section(ws, cursor, biz_date: str):
-    """Fill Rows 9-10 (VS Yesterday / VS LW) for 客服数据 B,C,F columns. D,E left empty for Phase 2."""
+    """Fill Rows 12-14 (今日/昨日/上周 raw values) and Rows 15-16 (VS Yesterday / VS LW) for 客服数据."""
     yesterday = str(date.fromisoformat(biz_date) - timedelta(days=1))
     lw_date = str(date.fromisoformat(biz_date) - timedelta(days=7))
 
@@ -420,18 +472,6 @@ def fill_cs_data_section(ws, cursor, biz_date: str):
     ord_yest = get_shop_metric_sum(cursor, "customer_service_performance_summary", "订单数", "date_time", yesterday)
     ord_lw = get_shop_metric_sum(cursor, "customer_service_performance_summary", "订单数", "date_time", lw_date)
 
-    cs_metrics = [
-        (2, zx_today, zx_yest, zx_lw),
-        (3, jd_today, jd_yest, jd_lw),
-        (6, ord_today, ord_yest, ord_lw),
-    ]
-
-    for col, today_val, yest_val, lw_val in cs_metrics:
-        vs_yest = today_val / yest_val if yest_val else None
-        vs_lw = today_val / lw_val if lw_val else None
-        _write_pct_cell(ws.cell(row=9, column=col), vs_yest)
-        _write_pct_cell(ws.cell(row=10, column=col), vs_lw)
-
     # Columns D-E: 首响/平响 from team_dashboard_daily
     first_today = _get_team_dashboard_metric(cursor, "first_response_sec", biz_date)
     first_yest = _get_team_dashboard_metric(cursor, "first_response_sec", yesterday)
@@ -441,6 +481,40 @@ def fill_cs_data_section(ws, cursor, biz_date: str):
     avg_yest = _get_team_dashboard_metric(cursor, "avg_response_sec", yesterday)
     avg_lw = _get_team_dashboard_metric(cursor, "avg_response_sec", lw_date)
 
+    # --- Rows 12-14: raw values (今日/昨日/上周) ---
+    # Col B=2(咨询人数, int), C=3(接待人数, int), D=4(首响, sec),
+    # E=5(平响, sec), F=6(订单数, int)
+    raw_cs_data = [
+        # (col, today, yest, lw, number_format)
+        (2, zx_today, zx_yest, zx_lw, '#,##0'),
+        (3, jd_today, jd_yest, jd_lw, '#,##0'),
+        (4, first_today, first_yest, first_lw, '0.0'),
+        (5, avg_today, avg_yest, avg_lw, '0.0'),
+        (6, ord_today, ord_yest, ord_lw, '#,##0'),
+    ]
+    for col, today_val, yest_val, lw_val, num_fmt in raw_cs_data:
+        for row, val in [(12, today_val), (13, yest_val), (14, lw_val)]:
+            cell = ws.cell(row=row, column=col)
+            if val is not None:
+                cell.value = val
+            cell.font = NORMAL_FONT
+            cell.number_format = num_fmt
+            cell.alignment = Alignment(vertical="center")
+            _apply_border(cell)
+
+    # --- Rows 15-16: VS Yesterday / VS LW ---
+    cs_metrics = [
+        (2, zx_today, zx_yest, zx_lw),
+        (3, jd_today, jd_yest, jd_lw),
+        (6, ord_today, ord_yest, ord_lw),
+    ]
+
+    for col, today_val, yest_val, lw_val in cs_metrics:
+        vs_yest = today_val / yest_val if yest_val else None
+        vs_lw = today_val / lw_val if lw_val else None
+        _write_pct_cell(ws.cell(row=15, column=col), vs_yest)
+        _write_pct_cell(ws.cell(row=16, column=col), vs_lw)
+
     resp_metrics = [
         (4, first_today, first_yest, first_lw),  # D: 首响
         (5, avg_today, avg_yest, avg_lw),          # E: 平响
@@ -448,8 +522,8 @@ def fill_cs_data_section(ws, cursor, biz_date: str):
     for col, today_val, yest_val, lw_val in resp_metrics:
         vs_yest = today_val / yest_val if (today_val and yest_val) else None
         vs_lw = today_val / lw_val if (today_val and lw_val) else None
-        _write_pct_cell(ws.cell(row=9, column=col), vs_yest)
-        _write_pct_cell(ws.cell(row=10, column=col), vs_lw)
+        _write_pct_cell(ws.cell(row=15, column=col), vs_yest)
+        _write_pct_cell(ws.cell(row=16, column=col), vs_lw)
 
 
 def _get_team_dashboard_metric(cursor, column: str, biz_date: str) -> float | None:
@@ -489,7 +563,7 @@ def _write_response_pct_cell(cell, value: float | None):
 
 
 def fill_monthly_actual_rows(ws, cursor, year: int):
-    """Fill Row 25 (实际消耗) and Row 26 (转化单量) from alimama monthly aggregation."""
+    """Fill Row 31 (实际消耗) and Row 32 (转化单量) from alimama monthly aggregation."""
     tables = ["star_store", "tmall_express", "gravity_rubiks_cube", "wanxiangtai"]
     month_cols = list("BCDEFGHIJKLM")
     fiscal_bounds = get_fiscal_month_bounds(year)
@@ -510,8 +584,8 @@ def fill_monthly_actual_rows(ws, cursor, year: int):
                     total_cost += parse_money(row[0])
                     total_orders += float(row[1] if row[1] else 0)
 
-        ws[f"{col_letter}25"] = total_cost if total_cost else None
-        ws[f"{col_letter}26"] = int(total_orders) if total_orders else None
+        ws[f"{col_letter}31"] = total_cost if total_cost else None
+        ws[f"{col_letter}32"] = int(total_orders) if total_orders else None
 
 
 # SKU keywords to exclude per SOP
@@ -638,13 +712,13 @@ def _print_pax_audit(cursor, step1: dict, step2: dict, as_of_date: str | None):
 
 
 def fill_yearly_pax_step1(ws, cursor, year: int, as_of_date: str | None = None):
-    """Fill C30:C41 with step 1 + step 2 combined monthly PAX."""
+    """Fill C36:C47 with step 1 + step 2 combined monthly PAX."""
     step1 = _get_step1_pax(cursor, year, as_of_date)
     step2 = _get_step2_pax(cursor, year, as_of_date)
 
     for month_num in range(1, 13):
         total_pax = step1.get(month_num, 0) + step2.get(month_num, 0)
-        r = 30 + month_num - 1
+        r = 36 + month_num - 1
         if total_pax > 0:
             ws.cell(row=r, column=3).value = total_pax
             ws.cell(row=r, column=3).font = NORMAL_FONT
@@ -673,37 +747,37 @@ def _natural_month_idx(biz_date_str: str) -> int:
 
 
 def fill_mtd_ytd_section(ws, cursor, biz_date: str, year: int):
-    """Fill MTD (Row 13-16) and YTD (Row 18-19) with formulas."""
+    """Fill MTD (Row 19-22) and YTD (Row 24-25) with formulas."""
     natural_idx = _natural_month_idx(biz_date)
     fiscal_idx = _fiscal_month_idx(biz_date, year)
     cols = list("BCDEFGHIJKLM")
 
-    # Row 13-14: natural month → PAX
-    ws["B13"] = f"=C{30 + natural_idx}"
-    ws["B13"].font = NORMAL_FONT
-    ws["B13"].alignment = Alignment(vertical="center")
-
-    ws["B14"] = f"=D{30 + natural_idx}"
-    ws["B14"].font = NORMAL_FONT
-    ws["B14"].number_format = '0%'
-    ws["B14"].alignment = Alignment(vertical="center")
-
-    # Row 15-16: fiscal month → alimama
-    ws["B15"] = f"={cols[fiscal_idx]}25"
-    ws["B15"].font = NORMAL_FONT
-    ws["B15"].number_format = '#,##0'
-    ws["B15"].alignment = Alignment(vertical="center")
-
-    ws["B16"] = f"={cols[fiscal_idx]}26"
-    ws["B16"].font = NORMAL_FONT
-    ws["B16"].alignment = Alignment(vertical="center")
-
-    ws["B18"] = "=C42"
-    ws["B18"].font = NORMAL_FONT
-    ws["B18"].number_format = '#,##0'
-    ws["B18"].alignment = Alignment(vertical="center")
-
-    ws["B19"] = "=D42"
+    # Row 19-20: natural month → PAX
+    ws["B19"] = f"=C{36 + natural_idx}"
     ws["B19"].font = NORMAL_FONT
-    ws["B19"].number_format = '0%'
     ws["B19"].alignment = Alignment(vertical="center")
+
+    ws["B20"] = f"=D{36 + natural_idx}"
+    ws["B20"].font = NORMAL_FONT
+    ws["B20"].number_format = '0%'
+    ws["B20"].alignment = Alignment(vertical="center")
+
+    # Row 21-22: fiscal month → alimama
+    ws["B21"] = f"={cols[fiscal_idx]}31"
+    ws["B21"].font = NORMAL_FONT
+    ws["B21"].number_format = '#,##0'
+    ws["B21"].alignment = Alignment(vertical="center")
+
+    ws["B22"] = f"={cols[fiscal_idx]}32"
+    ws["B22"].font = NORMAL_FONT
+    ws["B22"].alignment = Alignment(vertical="center")
+
+    ws["B24"] = "=C48"
+    ws["B24"].font = NORMAL_FONT
+    ws["B24"].number_format = '#,##0'
+    ws["B24"].alignment = Alignment(vertical="center")
+
+    ws["B25"] = "=D48"
+    ws["B25"].font = NORMAL_FONT
+    ws["B25"].number_format = '0%'
+    ws["B25"].alignment = Alignment(vertical="center")

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""从导出的 Excel 中提取「店铺关键数据完成情况」sheet 第1-19行，生成 HTML 邮件正文。
+"""从导出的 Excel 中提取「店铺关键数据完成情况」sheet 第1-25行，生成 HTML 邮件正文。
 
 用法:
     python3 scripts/generate_email_body.py exports/象往日报.xlsx         # 输出 HTML 到 stdout
@@ -92,7 +92,7 @@ def _resolve_cell(ws, row: int, col: int) -> tuple[str, str | None]:
     s = str(v)
     color = None
 
-    if s.startswith("=IFERROR") or s.startswith("=SUM") or (s.startswith("=") and row >= 13):
+    if s.startswith("=IFERROR") or s.startswith("=SUM") or (s.startswith("=") and row >= 19):
         resolved = resolve_formula(ws, s)
         if resolved is not None:
             is_rate = s.startswith("=IFERROR") or "完成率" in str(ws.cell(row=row, column=1).value or "")
@@ -173,11 +173,19 @@ def generate_daily_report_html(ws) -> str:
         f'店铺关键数据完成情况 &nbsp; Date: {date_val}</p>'
     )
 
-    # === 店铺数据 (Rows 4-6) ===
+    # === 店铺数据 (Rows 4-9) ===
     parts.append('<table style="width:100%; margin-bottom:12px;">')
     hdr = "".join(_th(cell_text(ws.cell(row=4, column=c).value)) for c in range(1, 8))
     parts.append(f"<tr>{hdr}</tr>")
-    for r, bg in ((5, BG_WHITE), (6, BG_STRIPE)):
+    # Rows 5-7: 今日/昨日/上周 raw values (no color)
+    for r, bg in ((5, BG_WHITE), (6, BG_STRIPE), (7, BG_WHITE)):
+        cells = []
+        for c in range(1, 8):
+            text, _color = _resolve_cell(ws, r, c)
+            cells.append(_td(text, color=None, bold=(c == 1), align="left" if c == 1 else "center", bg=bg, nowrap=(c > 1)))
+        parts.append(f"<tr>{''.join(cells)}</tr>")
+    # Rows 8-9: VS Yesterday / VS LW (with color rules)
+    for r, bg in ((8, BG_STRIPE), (9, BG_WHITE)):
         cells = []
         for c in range(1, 8):
             text, color = _resolve_cell(ws, r, c)
@@ -185,11 +193,19 @@ def generate_daily_report_html(ws) -> str:
         parts.append(f"<tr>{''.join(cells)}</tr>")
     parts.append("</table>")
 
-    # === 客服数据 (Rows 8-10) ===
+    # === 客服数据 (Rows 11-16) ===
     parts.append('<table style="width:100%; margin-bottom:12px;">')
-    hdr = "".join(_th(cell_text(ws.cell(row=8, column=c).value)) for c in range(1, 7))
+    hdr = "".join(_th(cell_text(ws.cell(row=11, column=c).value)) for c in range(1, 7))
     parts.append(f"<tr>{hdr}</tr>")
-    for r, bg in ((9, BG_WHITE), (10, BG_STRIPE)):
+    # Rows 12-14: 今日/昨日/上周 raw values (no color)
+    for r, bg in ((12, BG_WHITE), (13, BG_STRIPE), (14, BG_WHITE)):
+        cells = []
+        for c in range(1, 7):
+            text, _color = _resolve_cell(ws, r, c)
+            cells.append(_td(text, color=None, bold=(c == 1), align="left" if c == 1 else "center", bg=bg, nowrap=(c > 1)))
+        parts.append(f"<tr>{''.join(cells)}</tr>")
+    # Rows 15-16: VS Yesterday / VS LW (with color rules)
+    for r, bg in ((15, BG_STRIPE), (16, BG_WHITE)):
         cells = []
         for c in range(1, 7):
             text, color = _resolve_cell(ws, r, c)
@@ -197,10 +213,10 @@ def generate_daily_report_html(ws) -> str:
         parts.append(f"<tr>{''.join(cells)}</tr>")
     parts.append("</table>")
 
-    # === MTD / YTD (Rows 12-19) ===
+    # === MTD / YTD (Rows 18-25) ===
     parts.append('<table style="width:100%; margin-bottom:12px;">')
     parts.append(f"<tr>{_th('Month Target', colspan=2)}</tr>")
-    for r in range(13, 20):
+    for r in range(19, 26):
         label_text, _ = _resolve_cell(ws, r, 1)
         val_text, val_color = _resolve_cell(ws, r, 2)
         if not label_text:
