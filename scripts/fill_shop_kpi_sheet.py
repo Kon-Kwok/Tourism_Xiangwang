@@ -369,14 +369,16 @@ def _write_pct_cell(cell, value: float | None):
     """Write a percentage cell with +/- sign and green/red color.
 
     Stores (value - 1) so format '+0.00%;-0.00%' renders e.g. '+6.84%' or '-27.53%'.
+    When value is None (denominator=0), writes '——'.
     """
-    cell.number_format = '+0.00%;-0.00%'
+    cell.font = BLACK_FONT
     if value is None:
-        cell.value = None
-        cell.font = BLACK_FONT
+        cell.value = "——"
+        cell.number_format = '@'
     else:
         delta = value - 1.0
         cell.value = delta
+        cell.number_format = '+0.00%;-0.00%'
         if delta > 0:
             cell.font = Font(name="等线", size=11, color="FF008000")
         elif delta < 0:
@@ -434,7 +436,7 @@ def fill_shop_data_section(ws, cursor, biz_date: str):
     for col, today_val, yest_val, lw_val, num_fmt in raw_data:
         for row, val in [(5, today_val), (6, yest_val), (7, lw_val)]:
             cell = ws.cell(row=row, column=col)
-            cell.value = val if val else (None if col in (4, 7) else 0)
+            cell.value = val if val else 0
             cell.font = NORMAL_FONT
             cell.number_format = num_fmt
             cell.alignment = Alignment(vertical="center")
