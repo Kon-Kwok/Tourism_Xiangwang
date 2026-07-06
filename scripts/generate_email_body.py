@@ -82,8 +82,12 @@ def resolve_formula(ws, ref_str: str):
         return None
 
 
-def _resolve_cell(ws, row: int, col: int) -> tuple[str, str | None]:
-    """Return (display_text, color) for a cell."""
+def _resolve_cell(ws, row: int, col: int, is_vs_row: bool = False) -> tuple[str, str | None]:
+    """Return (display_text, color) for a cell.
+
+    is_vs_row: True for VS Yesterday/VS LW rows (8-9, 15-16), where the cell
+    stores a delta (value - 1.0) rather than a raw number.
+    """
     cell = ws.cell(row=row, column=col)
     v = cell.value
     if v is None:
@@ -109,6 +113,20 @@ def _resolve_cell(ws, row: int, col: int) -> tuple[str, str | None]:
             return text, color
         else:
             return cell_text(v), None
+
+    # VS rows store delta values (ratio - 1.0), format as +/- percentages
+    if is_vs_row and isinstance(v, (int, float)):
+        pct = float(v)
+        if pct == 0:
+            text = "0.00%"
+            color = None
+        elif -1 < pct < 1:
+            text = f"{pct:+.2%}"
+            color = GREEN if pct > 0 else RED
+        else:
+            text = f"{pct:+.2%}"
+            color = None
+        return text, color
 
     if isinstance(v, float) and -1 < v < 1:
         text = f"{v:+.2%}"
@@ -188,7 +206,7 @@ def generate_daily_report_html(ws) -> str:
     for r, bg in ((8, BG_STRIPE), (9, BG_WHITE)):
         cells = []
         for c in range(1, 8):
-            text, color = _resolve_cell(ws, r, c)
+            text, color = _resolve_cell(ws, r, c, is_vs_row=True)
             cells.append(_td(text, color=color, bold=(c == 1), align="left" if c == 1 else "center", bg=bg, nowrap=(c > 1)))
         parts.append(f"<tr>{''.join(cells)}</tr>")
     parts.append("</table>")
@@ -208,7 +226,7 @@ def generate_daily_report_html(ws) -> str:
     for r, bg in ((15, BG_STRIPE), (16, BG_WHITE)):
         cells = []
         for c in range(1, 7):
-            text, color = _resolve_cell(ws, r, c)
+            text, color = _resolve_cell(ws, r, c, is_vs_row=True)
             cells.append(_td(text, color=color, bold=(c == 1), align="left" if c == 1 else "center", bg=bg, nowrap=(c > 1)))
         parts.append(f"<tr>{''.join(cells)}</tr>")
     parts.append("</table>")
