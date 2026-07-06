@@ -380,13 +380,13 @@ def _write_pct_cell(cell, value: float | None):
         delta = value - 1.0
         cell.value = delta
         cell.number_format = '+0.00%;-0.00%'
+        cell.alignment = Alignment(vertical="center")
         if delta > 0:
             cell.font = Font(name="等线", size=11, color="FF008000")
         elif delta < 0:
             cell.font = Font(name="等线", size=11, color="FFFF0000")
         else:
             cell.font = Font(name="等线", size=11, color="FF000000")
-    cell.alignment = Alignment(vertical="center")
     _apply_border(cell)
 
 
