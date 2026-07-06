@@ -373,8 +373,9 @@ def _write_pct_cell(cell, value: float | None):
     """
     cell.font = BLACK_FONT
     if value is None:
-        cell.value = "——"
+        cell.value = "-"
         cell.number_format = '@'
+        cell.alignment = Alignment(vertical="center", horizontal="right")
     else:
         delta = value - 1.0
         cell.value = delta
