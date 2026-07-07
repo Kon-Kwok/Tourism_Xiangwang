@@ -108,7 +108,7 @@ def _resolve_cell(ws, row: int, col: int, is_vs_row: bool = False) -> tuple[str,
                 text = f"{resolved:,.2f}" if resolved != int(resolved) else f"{int(resolved):,}"
             else:
                 text = str(resolved)
-            if not is_rate and isinstance(resolved, float) and -1 < resolved < 1 and resolved != 0:
+            if not is_rate and isinstance(resolved, float) and resolved != 0:
                 color = GREEN if resolved > 0 else RED
             return text, color
         else:
@@ -120,12 +120,9 @@ def _resolve_cell(ws, row: int, col: int, is_vs_row: bool = False) -> tuple[str,
         if pct == 0:
             text = "0.00%"
             color = None
-        elif -1 < pct < 1:
-            text = f"{pct:+.2%}"
-            color = GREEN if pct > 0 else RED
         else:
             text = f"{pct:+.2%}"
-            color = None
+            color = GREEN if pct > 0 else RED
         return text, color
 
     if isinstance(v, float) and -1 < v < 1:
