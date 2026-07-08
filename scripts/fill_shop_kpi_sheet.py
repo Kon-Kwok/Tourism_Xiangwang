@@ -347,12 +347,12 @@ def get_shop_metric_sum(cursor, table: str, column: str, date_col: str, biz_date
 
 
 def get_alimama_sum(cursor, column: str, biz_date: str) -> float:
-    """Sum a column across the 5 alimama channel tables for a given date.
+    """Sum a column across the 4 alimama channel tables for a given date.
 
     Fetches all rows and sums in Python because the sales column stores
     values as '¥1,234.56' (varchar), which MySQL SUM() cannot parse.
     """
-    tables = ["star_store", "tmall_express", "gravity_rubiks_cube", "wanxiangtai", "wanxiangtai_2"]
+    tables = ["star_store", "tmall_express", "gravity_rubiks_cube", "wanxiangtai"]
     total = 0.0
     for tbl in tables:
         cursor.execute(
@@ -571,7 +571,7 @@ def _write_response_pct_cell(cell, value: float | None):
 
 def fill_monthly_actual_rows(ws, cursor, year: int):
     """Fill Row 31 (实际消耗) and Row 32 (转化单量) from alimama monthly aggregation."""
-    tables = ["star_store", "tmall_express", "gravity_rubiks_cube", "wanxiangtai", "wanxiangtai_2"]
+    tables = ["star_store", "tmall_express", "gravity_rubiks_cube", "wanxiangtai"]
     month_cols = list("BCDEFGHIJKLM")
     fiscal_bounds = get_fiscal_month_bounds(year)
 
