@@ -38,6 +38,7 @@ ALIMAMA_TABLE_MAP = {
     "直通车": "tmall_express",
     "引力魔方": "gravity_rubiks_cube",
     "万相台": "wanxiangtai",
+    "万相台2": "wanxiangtai_2",
 }
 ALIMAMA_BASE_METRICS = ("cost", "imp", "click", "order", "sales", "shopping_cart", "bookmark_product", "bookmark_store")
 NUMERIC_TEXT_RE = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$")
